@@ -44,13 +44,16 @@ export default function App() {
   useEffect(() => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
-      const certParam = urlParams.get('cert') || urlParams.get('lote') || urlParams.get('dictamen');
-      if (certParam) {
+      const rawParam = urlParams.get('cert') || urlParams.get('lote') || urlParams.get('dictamen');
+      if (rawParam) {
+        const cleanParam = rawParam.replace(/^MX-/i, '').toLowerCase();
         const found = lots.find(
           (l) =>
-            l.code.toLowerCase() === certParam.toLowerCase() ||
-            l.id.toLowerCase() === certParam.toLowerCase() ||
-            l.code.toLowerCase().includes(certParam.toLowerCase())
+            l.code.toLowerCase() === rawParam.toLowerCase() ||
+            l.code.toLowerCase() === cleanParam ||
+            l.id.toLowerCase() === rawParam.toLowerCase() ||
+            l.id.toLowerCase() === cleanParam ||
+            l.code.toLowerCase().includes(cleanParam)
         );
         if (found) {
           setSelectedLot(found);
