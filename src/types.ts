@@ -117,7 +117,8 @@ export type BotCardType =
   | 'trazabilidad_pasaporte'
   | 'agente_multiagente'
   | 'logistica_coyote'
-  | 'regalias_mercado';
+  | 'regalias_mercado'
+  | 'recibo_ticket';
 
 export interface BotCardData {
   type: BotCardType;
@@ -126,4 +127,22 @@ export interface BotCardData {
   agentName?: string;
   badge?: string;
   data?: Record<string, any>;
+}
+
+/**
+ * Interface for Issue #1.1: Modo Parcela Offline
+ * Used by students to persist harvest data locally in IndexedDB before syncing to Stellar
+ */
+export interface PendingOfflineLot {
+  tempId: string;
+  producerName: string;
+  community: string;
+  cropType: 'cafe' | 'miel' | 'pulque' | 'artesania';
+  variety: string;
+  weightKgOrUnits: number;
+  priceExpectedMxn: number;
+  photoDataUrl: string;
+  voiceAudioBlob?: Blob;
+  recordedAt: number;
+  syncStatus: 'pending' | 'syncing' | 'synced';
 }
