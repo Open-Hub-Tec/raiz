@@ -39,6 +39,21 @@ export default function App() {
   const [isMicDiagnosticModalOpen, setIsMicDiagnosticModalOpen] = useState(false);
   const [targetChatProducer, setTargetChatProducer] = useState<string | null>(null);
   const [chatInitialMessage, setChatInitialMessage] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  // Monitor network status for Modo Parcela (Offline Mode)
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Deep-linking from shared certificate links (e.g., ?cert=MX-2024-984 or ?cert=lot-984)
   useEffect(() => {
@@ -303,7 +318,23 @@ export default function App() {
         onToggleLanguage={() => setAppLanguage((prev) => (prev === 'es' ? 'mix' : 'es'))}
         elderMode={elderMode}
         onToggleElderMode={() => setElderMode((prev) => !prev)}
+        isOnline={isOnline}
       />
+
+      {/* Persistent Offline Banner: Only rendered when there is NO internet */}
+      {!isOnline && (
+        <div className="w-full bg-[#a73918] text-white px-3.5 py-2 text-[12px] font-extrabold flex items-center justify-between shadow-md border-b-2 border-amber-300 z-30 animate-pulse">
+          <div className="flex items-center gap-2 max-w-[85%]">
+            <span className="material-symbols-outlined text-[20px] text-amber-200">wifi_off</span>
+            <span>
+              <strong>Modo Parcela Activo:</strong> Sin conexión a internet. Tus cosechas, notas de voz y fotos se guardan en la memoria de este teléfono.
+            </span>
+          </div>
+          <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full uppercase tracking-wider font-black">
+            Offline
+          </span>
+        </div>
+      )}
 
       {/* Screen Routing */}
       {currentTab === 'menu' && currentScreen === 'menu_principal' && (
@@ -341,6 +372,7 @@ export default function App() {
           onLotCreated={handleLotCreated}
           elderMode={elderMode}
           appLanguage={appLanguage}
+          isOnline={isOnline}
         />
       )}
 

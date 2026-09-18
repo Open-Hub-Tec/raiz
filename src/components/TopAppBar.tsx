@@ -12,6 +12,7 @@ interface TopAppBarProps {
   onToggleLanguage?: () => void;
   elderMode?: boolean;
   onToggleElderMode?: () => void;
+  isOnline?: boolean;
 }
 
 export const TopAppBar: React.FC<TopAppBarProps> = ({
@@ -24,7 +25,8 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
   appLanguage = 'es',
   onToggleLanguage,
   elderMode = false,
-  onToggleElderMode
+  onToggleElderMode,
+  isOnline = true
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full bg-[#fcf9f3] border-b border-[#c1c8c2]/30 px-3 py-2 flex items-center justify-between shadow-xs">
@@ -75,23 +77,28 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
             </span>
           </h1>
           <div className="flex items-center gap-1 -mt-0.5">
-            {currentTab === 'menu' && (
+            {!isOnline ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+                <span className="text-[11px] font-extrabold text-[#a73918]">
+                  {appLanguage === 'mix' ? '🏕️ Ñu’u (Offline)' : '🏕️ Modo Parcela'}
+                </span>
+              </>
+            ) : currentTab === 'menu' ? (
               <>
                 <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
                 <span className="text-[11px] font-bold text-[#032517]">
                   {appLanguage === 'mix' ? '🟢 Tu’un Savi' : '🟢 En Línea'}
                 </span>
               </>
-            )}
-            {currentTab === 'chat' && (
+            ) : currentTab === 'chat' ? (
               <>
                 <span className="w-2 h-2 rounded-full bg-[#fe7952] animate-pulse"></span>
                 <span className="text-[11px] text-[#424843] font-medium">
                   {appLanguage === 'mix' ? 'Tu’un Bot' : 'Asistente Comunitario'}
                 </span>
               </>
-            )}
-            {currentTab === 'productos' && (
+            ) : (
               <>
                 <span className="w-2 h-2 rounded-full bg-[#fe7952]"></span>
                 <span className="text-[11px] text-[#424843] font-medium">Tienda Artesanal</span>

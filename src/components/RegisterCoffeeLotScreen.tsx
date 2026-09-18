@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppLanguage, ScreenView } from '../types';
+import { AppLanguage, ScreenView, PendingOfflineLot } from '../types';
 import { startAudioRecording, LiveRecorderSession } from '../utils/audioRecorder';
 import { getProductProfile, ProductProfile, sanitizeProductName } from '../utils/productUtils';
+import { saveOfflineLot } from '../utils/offlineStorage';
 
 interface RegisterCoffeeLotScreenProps {
   selectedProductType?: string;
@@ -9,6 +10,7 @@ interface RegisterCoffeeLotScreenProps {
   onLotCreated?: (customLot?: any) => void;
   elderMode?: boolean;
   appLanguage?: AppLanguage;
+  isOnline?: boolean;
 }
 
 export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = ({
@@ -16,7 +18,8 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
   onNavigateScreen,
   onLotCreated,
   elderMode = true,
-  appLanguage = 'es'
+  appLanguage = 'es',
+  isOnline = true
 }) => {
   const isMixteco = appLanguage === 'mix';
   const cleanProductName = sanitizeProductName(selectedProductType || 'Café');
@@ -645,7 +648,28 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
   const [isValidating, setIsValidating] = useState<boolean>(false);
   const [validationStep, setValidationStep] = useState<number>(1);
 
-  const handleSendValidation = () => {
+  const handleSendValidation = async () => {
+    // If working without network coverage in the mountain parcel, persist to IndexedDB immediately
+    if (!isOnline) {
+      try {
+        const offlineRecord: PendingOfflineLot = {
+          tempId: `PARCELA-${Date.now()}`,
+          producerName: 'Don Eutiquio (Productor Mixteco)',
+          community: 'Santa María Cuquila, Tlaxiaco',
+          cropType: isCoffee ? 'cafe' : isHoney ? 'miel' : isPulque ? 'pulque' : 'artesania',
+          variety: variedad || profile.displayName,
+          weightKgOrUnits: profile.defaultVolume || 50,
+          priceExpectedMxn: profile.defaultPrice || 120,
+          photoDataUrl: photoOneUrl,
+          recordedAt: Date.now(),
+          syncStatus: 'pending'
+        };
+        await saveOfflineLot(offlineRecord);
+      } catch (err) {
+        console.warn('Error guardando en almacenamiento fuera de línea:', err);
+      }
+    }
+
     setIsValidating(true);
     setValidationStep(1);
 
@@ -756,6 +780,23 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
 
   return (
     <main className="flex-1 w-full max-w-md mx-auto px-4 py-2 flex flex-col gap-4 pb-36">
+      {/* Offline Rural Indicator Banner: ONLY when disconnected */}
+      {!isOnline && (
+        <div className="bg-gradient-to-r from-orange-100 to-amber-100 border-2 border-orange-400/90 rounded-2xl p-3 shadow-xs flex items-center gap-2.5 text-[#a73918]">
+          <span className="material-symbols-outlined text-[24px] text-orange-700 shrink-0 animate-bounce">
+            cloud_off
+          </span>
+          <div className="text-[12px] leading-tight">
+            <strong className="block font-black text-[#032517] text-[13px]">
+              🏕️ Modo Parcela Sin Internet
+            </strong>
+            <span className="text-[#a73918] font-medium">
+              Puedes tomar fotos, notas de voz y registrar tu cosecha. Se guardará de forma segura en este teléfono hasta tener señal en el pueblo.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Context Step Badge & Modo Fácil Toggle */}
       <div className="pt-1 flex items-center justify-between gap-2">
         <div className="inline-flex items-center gap-2 bg-[#f0eee8] px-3 py-1.5 rounded-full border border-[#c1c8c2]/40">
