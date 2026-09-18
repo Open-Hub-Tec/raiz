@@ -346,6 +346,7 @@ export default function App() {
           onOpenMicDiagnostic={() => setIsMicDiagnosticModalOpen(true)}
           appLanguage={appLanguage}
           elderMode={elderMode}
+          isOnline={isOnline}
           onOpenTechHelp={() => {
             setTargetChatProducer('Equipo de Asistencia Técnica');
             setCurrentTab('chat');

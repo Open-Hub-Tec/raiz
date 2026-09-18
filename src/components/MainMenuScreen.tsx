@@ -11,6 +11,7 @@ interface MainMenuScreenProps {
   onOpenMicDiagnostic?: () => void;
   appLanguage?: AppLanguage;
   elderMode?: boolean;
+  isOnline?: boolean;
 }
 
 export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
@@ -21,7 +22,8 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
   onOpenMap,
   onOpenMicDiagnostic,
   appLanguage = 'es',
-  elderMode = false
+  elderMode = false,
+  isOnline = true
 }) => {
   const [numericInput, setNumericInput] = useState('');
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -255,15 +257,17 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
         <span className="text-[14px] font-extrabold text-[#a73918]">Raíz</span>
       </div>
 
-      {/* BANNER TRANQUILIZADOR: MODO PARCELA OFFLINE */}
-      <div className="flex items-center gap-2.5 bg-emerald-950 text-emerald-100 text-[11.5px] px-3.5 py-2 rounded-2xl border border-emerald-800 shadow-xs">
-        <span className="material-symbols-outlined text-[18px] text-emerald-300 shrink-0">
-          cell_tower
-        </span>
-        <span className="leading-tight">
-          <strong className="text-white font-bold">Modo Parcela Activo:</strong> Puedes registrar tus fotos y audios sin señal celular; se guardan en tu teléfono y se sincronizan al llegar al pueblo.
-        </span>
-      </div>
+      {/* BANNER TRANQUILIZADOR: MODO PARCELA OFFLINE (SOLO cuando NO hay internet) */}
+      {!isOnline && (
+        <div className="flex items-center gap-2.5 bg-emerald-950 text-emerald-100 text-[11.5px] px-3.5 py-2 rounded-2xl border border-emerald-800 shadow-xs animate-pulse">
+          <span className="material-symbols-outlined text-[18px] text-emerald-300 shrink-0">
+            cell_tower
+          </span>
+          <span className="leading-tight">
+            <strong className="text-white font-bold">Modo Parcela Activo:</strong> Puedes registrar tus fotos y audios sin señal celular; se guardan en tu teléfono y se sincronizan al llegar al pueblo.
+          </span>
+        </div>
+      )}
 
       {/* BURBUJA DE CHAT ASISTENTE (Tipo conversación rural) */}
       <div className="flex items-start gap-3">
