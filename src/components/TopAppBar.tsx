@@ -1,5 +1,6 @@
 import React from 'react';
 import { AppLanguage, NavigationTab, ScreenView } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface TopAppBarProps {
   currentTab: NavigationTab;
@@ -109,6 +110,9 @@ export const TopAppBar: React.FC<TopAppBarProps> = ({
       </div>
 
       <div className="flex items-center gap-1.5">
+        {/* PWA In-App Install Button */}
+        <PWAInstallButton />
+
         {/* Toggle Language Mixteco (Tu'un Savi) / Español */}
         {onToggleLanguage && (
           <button

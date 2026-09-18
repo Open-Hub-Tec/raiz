@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="128" fill="#032517"/>
+  <circle cx="256" cy="256" r="190" fill="#1b3b2b"/>
+  <!-- Stylized Earth & Sprout -->
+  <path d="M256 120 C220 180 170 230 170 300 C170 348 208 386 256 386 C304 386 342 348 342 300 C342 230 292 180 256 120 Z" fill="#e8933a"/>
+  <path d="M256 180 C270 220 300 240 310 270 C315 285 305 300 290 300 C270 300 256 270 256 240 Z" fill="#ffdbd1"/>
+  <!-- Root veins -->
+  <path d="M256 386 L256 440 M230 420 L210 445 M282 420 L302 445" stroke="#a73918" stroke-width="12" stroke-linecap="round"/>
+</svg>
