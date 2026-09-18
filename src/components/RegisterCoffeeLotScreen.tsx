@@ -1298,37 +1298,49 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
             </div>
           </div>
 
-          {/* Voice Input Recorder */}
+          {/* Voice Input Recorder - Primary Voice-First Option (Variant-Friendly) */}
           <div className="pt-1 flex flex-col gap-2">
-            <div className="flex items-center gap-2 p-2 bg-[#f0eee8] rounded-2xl border border-[#c1c8c2]/60">
-              <button
-                type="button"
-                onClick={toggleVoiceNoteRecording}
-                className={`w-11 h-11 rounded-full text-white flex items-center justify-center shrink-0 active:scale-95 shadow-xs cursor-pointer ${
-                  isRecording ? 'bg-red-600 animate-pulse' : 'bg-[#a73918] hover:bg-[#8c2d12]'
-                }`}
-                title={isRecording ? 'Detener y procesar audio' : 'Grabar nota de voz'}
-              >
-                <span className="material-symbols-outlined text-[22px]">
-                  {isRecording ? 'stop' : 'mic'}
-                </span>
-              </button>
-              <div className="flex-1 px-2 overflow-hidden">
-                <div className="text-[13px] text-[#032517] font-semibold truncate flex items-center gap-1.5">
-                  {isRecording && <span className="w-2 h-2 rounded-full bg-red-600 animate-ping inline-block" />}
-                  <span>{isRecording ? 'Grabando audio de cosecha...' : 'Grabar nota complementaria'}</span>
+            <div className={`p-3 rounded-2xl border transition-all ${
+              isRecording
+                ? 'bg-red-50 border-red-300 shadow-md ring-2 ring-red-400'
+                : 'bg-[#fffaf5] border-[#fe7952]/60 shadow-xs'
+            }`}>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={toggleVoiceNoteRecording}
+                  className={`w-14 h-14 rounded-full text-white flex items-center justify-center shrink-0 active:scale-95 shadow-md cursor-pointer transition-transform ${
+                    isRecording ? 'bg-red-600 animate-pulse' : 'bg-[#a73918] hover:bg-[#8c2d12]'
+                  }`}
+                  title={isRecording ? 'Detener y guardar audio' : 'Grabar tu voz en tu lengua'}
+                  aria-label={isRecording ? 'Detener grabación de voz' : 'Grabar descripción en tu lengua materna'}
+                >
+                  <span className="material-symbols-outlined text-[30px]">
+                    {isRecording ? 'stop' : 'mic'}
+                  </span>
+                </button>
+                <div className="flex-1 overflow-hidden">
+                  <div className="text-[14px] text-[#032517] font-extrabold truncate flex items-center gap-1.5">
+                    {isRecording && <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping inline-block" />}
+                    <span>{isRecording ? 'Escuchando tu voz...' : '🗣️ Habla en tu lengua materna'}</span>
+                  </div>
+                  <div className="text-[12px] text-[#424843] leading-snug">
+                    {isRecording
+                      ? liveVoiceTranscript
+                        ? `"${liveVoiceTranscript}"`
+                        : 'Grabando audio de origen...'
+                      : 'Graba en tu variante (Mixteco, Zapoteco o Español). No necesitas escribir.'}
+                  </div>
                 </div>
-                <div className="text-[11px] text-[#424843] truncate">
-                  {isRecording
-                    ? liveVoiceTranscript
-                      ? `"${liveVoiceTranscript}"`
-                      : 'Habla claro frente al micrófono...'
-                    : 'Presiona el botón para dictar o describir tu lote'}
+                <div className="flex flex-col items-end shrink-0">
+                  <span className={`text-[13px] font-mono font-black ${isRecording ? 'text-red-700 animate-pulse' : 'text-[#a73918]'}`}>
+                    {formatTimer(recordSeconds)}
+                  </span>
+                  <span className="text-[10px] text-[#727973] uppercase font-bold">
+                    {isRecording ? 'REC' : 'VOZ'}
+                  </span>
                 </div>
               </div>
-              <span className="text-xs font-mono font-bold text-[#a73918] pr-2">
-                {formatTimer(recordSeconds)}
-              </span>
             </div>
 
             {/* Live audio level meter when recording */}

@@ -256,7 +256,7 @@ export const DigitalPassportScreen: React.FC<DigitalPassportScreenProps> = ({
                 </div>
               </div>
 
-              {/* Inmutable Proof Seal */}
+              {/* Inmutable Proof Seal - Anti-Piracy Protection */}
               <div className="bg-[#1b3b2b] text-white p-2.5 rounded-xl flex items-center justify-between text-[11px] shadow-xs">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-amber-300 text-[18px]">
@@ -264,10 +264,10 @@ export const DigitalPassportScreen: React.FC<DigitalPassportScreenProps> = ({
                   </span>
                   <div>
                     <span className="font-bold block text-white text-[12px]">
-                      Certificado de Origen Inalterable
+                      Sello Comunitario Antifraude (TecNM)
                     </span>
                     <span className="text-[10px] text-emerald-200/90">
-                      Red Stellar Comunitaria · Registro #{lot.nomCompliance.stellarTxLedger || '52,491,802'}
+                      Protegido contra copias y coyotaje · Registro Oficial #{lot.nomCompliance.stellarTxLedger || '52,491,802'}
                     </span>
                   </div>
                 </div>
