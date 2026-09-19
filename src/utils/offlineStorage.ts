@@ -85,3 +85,5 @@ export async function deleteOfflineLot(tempId: string): Promise<void> {
     }
   }
 }
+
+export const removeOfflineLot = deleteOfflineLot;

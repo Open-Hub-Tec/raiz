@@ -16,6 +16,7 @@ import { NormativeCertificateModal } from './components/NormativeCertificateModa
 import { CartModal, CartItem } from './components/CartModal';
 import { RegionalMapModal } from './components/RegionalMapModal';
 import { MicrophoneDiagnosticModal } from './components/MicrophoneDiagnosticModal';
+import { RaizCore } from './core';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<NavigationTab>('menu');
@@ -41,8 +42,10 @@ export default function App() {
   const [chatInitialMessage, setChatInitialMessage] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
 
-  // Monitor network status for Modo Parcela (Offline Mode)
+  // Monitor network status for Modo Parcela (Offline Mode) & Initialize RaizCore
   useEffect(() => {
+    RaizCore.init();
+
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
