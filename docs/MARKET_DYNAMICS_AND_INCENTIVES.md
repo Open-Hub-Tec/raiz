@@ -71,9 +71,10 @@ Producers have finite annual yields (e.g., 15 to 40 quintales per harvest):
 
 Under traditional systems, the relationship between reseller and producer is zero-sum: every peso the reseller makes after purchase is completely disconnected from the producer.
 
-Raíz transforms this into a **positive-sum ecosystem via Soroban Smart Contracts**:
-* **8% Perpetual Royalty to Producer:** Every time the reseller packages, resells, or auctions a certified micro-lot, **8% of the secondary resale volume** is streamed back to the producer's Stellar wallet.
-* **2% Community Tequio Pool:** Feeds collective agricultural infrastructure.
+Raíz transforms this into a **positive-sum ecosystem via RaizCore Policy Engine (`src/core/policy/FairTradeEngine.ts`) and Soroban Smart Contracts**:
+* **8% Perpetual Royalty to Producer:** Every time the reseller packages, resells, or auctions a certified micro-lot, **8% of the secondary resale volume** is calculated by `FairTradeEngine` and streamed back to the producer's Stellar wallet.
+* **2% Community Tequio Pool:** Feeds collective agricultural infrastructure and elder mutual funds.
+* **Anti-Coyote Guardrails:** The engine programmatically triggers warnings whenever incoming trade offers fall below fair regional cost thresholds ($90 MXN/kg for coffee, $250 MXN for loom textiles).
 * **Incentive Alignment:** The producer **actively wants the reseller to succeed and sell at the highest possible price**, because higher downstream margins generate continuous passive revenue without requiring additional labor or logistical overhead from the farming family.
 
 ---

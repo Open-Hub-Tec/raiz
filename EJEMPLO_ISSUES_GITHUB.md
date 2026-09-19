@@ -158,3 +158,28 @@ El estudiante abrirá un PR incluyendo:
    - Registrar un lote con foto y nota de voz.
    - Presionar guardar y mostrar el mensaje de confirmación de Modo Parcela.
    - Recargar la página con `F5` sin internet y mostrar la pestaña *Application > Storage > IndexedDB* demostrando que los datos siguen ahí intactos.
+
+---
+---
+
+# 📌 ISSUE #1.3: [Core/Architecture] Desacoplamiento de Lógica en Raíz Core (`/src/core`)
+
+**Título para GitHub:**  
+`[Core/Architecture]: Implementación de Raíz Core (Crypto, SyncEngine, FairTrade y SorobanAdapter)`
+
+**Etiquetas:** `architecture`, `clean-code`, `domain-core`, `web3`, `drips-eligible`  
+**Asignado a:** *Equipo de Estudiantes (Brigada de Arquitectura & Web3 - 2 estudiantes)*  
+**Tiempo estimado:** 2 semanas  
+**Dificultad técnica:** Media-Avanzada / Arquitectura de Software y Criptografía
+
+---
+
+### 🎯 1. Objetivo del Estudiante
+Separar completamente la lógica de negocio y criptografía de los componentes visuales de React. Toda la lógica fundamental debe residir en `src/core/` para que sea reutilizable tanto en la PWA actual como en futuras apps nativas de Android (Kotlin) o bots comunitarios de WhatsApp.
+
+### 🛠️ 2. Módulos Implementados en `/src/core/`:
+- **`CryptoEngine` (`src/core/crypto/`):** Cálculo de identificadores únicos y hashes SHA-256 inmutables para fotos y testimonios de voz en Tu'un Savi.
+- **`SyncEngine` (`src/core/sync/`):** Gestor de la cola de salida (Outbox) con observador de reconexión automática (`initAutoSync()`).
+- **`FairTradeEngine` (`src/core/policy/`):** Reglas anti-coyote (alerta en precios de café < $90 MXN o artesanía < $250 MXN) y cálculo de regalías secundarias (8% para artesano, 2% para fondo comunal).
+- **`SorobanAdapter` (`src/core/blockchain/`):** Adaptador agnóstico para invocar los contratos inteligentes de Stellar Testnet.
+

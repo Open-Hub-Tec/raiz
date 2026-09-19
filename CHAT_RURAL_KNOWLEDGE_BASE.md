@@ -48,8 +48,11 @@
   • Menú háptico simplificado de 4 botones de alto contraste para luz solar
   • Generación y lectura de Códigos QR seguros sin necesidad de internet en la montaña
 ══════════════════════════════════════════════════════════════════════════════════════════════════════════
-  CAPA 2: MÓDULO ÚNICO DE REGISTRO UNIVERSAL (ORQUESTADOR MULTI-PRODUCTO)
-  • Un solo flujo de entrada para: Café, Miel, Textiles en Telar, Palma, Barro Rojo, Maíz
+  CAPA 2: NÚCLEO DESACOPLADO (RAÍZ CORE - `src/core/`)
+  • 🔄 SyncEngine: Cola Outbox persistente en IndexedDB con auto-sincronización al detectar señal
+  • 🔐 CryptoEngine: Generación de Digest SHA-256 sobre audio testimonial en Tu'un Savi y fotos
+  • ⚖️ FairTradeEngine: Barrera anti-coyotaje ($90 MXN café / $250 textil) y cálculo de regalías (8% + 2%)
+  • 🌌 SorobanAdapter: Despachador agnóstico de contratos LotPassport y FairEscrow en Stellar
   • Visión por IA: Clasifica pureza de miel, densidad de tejido o secado de café en cama africana
   • Emisión del Pasaporte Digital con Hash único (Ej. MX-OAX-2026-912)
 ══════════════════════════════════════════════════════════════════════════════════════════════════════════

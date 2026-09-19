@@ -27,8 +27,12 @@ Raíz is not a generic web application; it is an **Open-Source Digital Public Go
 2. **Zero-Gas Fee-Bump Sponsorship Architecture:**
    - Designed institutional fee-sponsorship so indigenous elders never pay network fees or handle raw crypto tokens.
 
-3. **Field-Proven Rural UX (Offline Parcel Mode):**
-   - Implemented an **Offline-First PWA** architecture where farmers deep in the mountain parcels (without cellular coverage) record harvest data and voice notes in **Tu'un Savi (Mixteco)** locally, auto-syncing to Stellar upon reconnection.
+3. **Field-Proven Rural UX & Decoupled Domain Architecture (`src/core/`):**
+   - Implemented an **Offline-First PWA** architecture with a decoupled domain engine:
+     - **`SyncEngine` (`src/core/sync/`):** Persistent Outbox queue in IndexedDB with auto-reconnection listeners.
+     - **`CryptoEngine` (`src/core/crypto/`):** SHA-256 digest computation over authentic oral recordings in **Tu'un Savi (Mixteco)** and harvest photos.
+     - **`FairTradeEngine` (`src/core/policy/`):** Anti-coyote price guardrails ($90 MXN/kg coffee minimum) and automated secondary royalty distribution (8% artisan / 2% community fund).
+     - **`SorobanAdapter` (`src/core/blockchain/`):** Pluggable RPC client ready for web, mobile, and serverless execution.
 
 4. **Physical Provenance & Anti-Counterfeiting:**
    - Printable cryptographic QR hang-tags for sacks and artisan textiles linking physical goods directly to on-chain Soroban passports.

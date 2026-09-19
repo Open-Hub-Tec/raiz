@@ -53,33 +53,49 @@ In the Mixteca Alta region, over 80% of agricultural producers and artisans are 
 
 ## 🏗️ System Architecture
 
-Raíz is engineered as a responsive, modular full-stack decentralized web app (PWA ready):
+Raíz is engineered as an offline-first, modular architecture cleanly decoupling UI, Domain Core, and External Ledgers:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           CLIENT / PWA (Web)                            │
-│  React 19 + TypeScript + Tailwind CSS + Lucide Icons + Motion Engine   │
-│  - Accessible elder mode (High-contrast UI, enlarged touch targets)    │
-│  - Web Speech API TTS synthesis (Calibrated 0.92x cadence)             │
-│  - Community audio note recorder with live waveform visualization      │
-│  - Direct camera capture for automated lot sample inspection            │
+│                       CLIENT / PRESENTATION LAYER                       │
+│  React 19 + TypeScript + Vite PWA + Tailwind CSS + Lucide Icons         │
+│  - Service Worker Offline Caching (Zero-downtime offline launch)        │
+│  - Single-view Touch UI (56px touch targets, high sunlight contrast)    │
+│  - Oral-First Voice Assistant (Mixteco / Tu'un Savi, Zapoteco, Spanish) │
+│  - Elder Accessibility Mode (Aa+ enlarged typography & haptics)         │
+│  - QR & NFC Tag Generator for physical bag/garment attestation          │
 └────────────────────────────────────┬────────────────────────────────────┘
-                                     │ REST / JSON APIs
+                                     │ Direct Invocations
 ┌────────────────────────────────────▼────────────────────────────────────┐
-│                    NODE.JS / EXPRESS BACKEND SERVICE                    │
-│  Express + tsx + esbuild                                                │
-│  - Secure proxy endpoint /api/analyze-image to Gemini 2.5 Vision API    │
-│  - Mexican Agronomic Norms Validation Engine (NMX-F-083, NOM specs)     │
-│  - Stellar Horizon transaction & Soroban contract dispatcher            │
-└──────────────────┬──────────────────────────────────┬───────────────────┘
-                   │                                  │
-┌──────────────────▼──────────────────┐   ┌───────────▼───────────────────┐
-│     MULTIMODAL AI SERVICE           │   │        STELLAR NETWORK        │
+│                  NATIVE DECOUPLED CORE (`src/core/`)                     │
+│  Platform-Agnostic Domain Logic (Runs in Web, Mobile, or Node.js)       │
+│                                                                         │
+│  1. 🔄 SyncEngine (`core/sync/`)                                         │
+│     - Outbox Queue with IndexedDB local persistence                     │
+│     - Auto-reconnection listener for zero-loss batch syncing             │
+│                                                                         │
+│  2. 🔐 CryptoEngine (`core/crypto/`)                                     │
+│     - SHA-256 Digest generation over audio testimonials & harvest photos │
+│     - Canonical community digital passport hashing                      │
+│                                                                         │
+│  3. ⚖️ FairTradeEngine (`core/policy/`)                                  │
+│     - Anti-Coyote Alert Thresholds ($90 MXN coffee, $250 crafts)         │
+│     - Automatic 8% producer perpetual royalty & 2% tequio fund calc     │
+│                                                                         │
+│  4. 🌌 SorobanAdapter (`core/blockchain/`)                              │
+│     - Stellar Horizon & Soroban RPC dispatcher                          │
+│     - LotPassport & FairEscrow contract bindings                        │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │
+                    ┌────────────────┴────────────────┐
+                    │                                 │
+┌───────────────────▼─────────────────┐   ┌───────────▼───────────────────┐
+│        MULTIMODAL AI SERVICE        │   │        STELLAR NETWORK        │
 │  Google Gemini 2.5 Flash            │   │  Stellar Horizon Testnet      │
 │  - Category & specimen detection    │   │  + Soroban Smart Contracts    │
 │  - Moisture, pest & defect scoring  │   │  - Immutable lot hash sealing │
 │  - Adulterant & purity detection    │   │  - Public audit explorer link │
-│  - Mismatch safety guardrails       │   │  - Digital Origin Passport    │
+│  - Mexican Agronomic Norms (NOM)    │   │  - Digital Origin Passport    │
 └─────────────────────────────────────┘   └───────────────────────────────┘
 ```
 
