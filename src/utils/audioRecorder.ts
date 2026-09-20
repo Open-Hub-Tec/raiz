@@ -7,6 +7,18 @@ export interface AudioRecordingResult {
   base64Audio: string;
   transcript: string;
   durationSeconds: number;
+  diagnostics: AudioRecordingDiagnostics;
+}
+
+export interface AudioRecordingDiagnostics {
+  constructorOptions: MediaRecorderOptions;
+  constructorAttempts: number;
+  reportedAudioBitsPerSecond: number | null;
+  channelCount: number | null;
+  sampleRate: number | null;
+  elapsedSeconds: number;
+  effectiveBitsPerSecond: number;
+  chunkCount: number;
 }
 
 export interface StartRecordingOptions {
@@ -90,26 +102,38 @@ export function selectAudioMimeType(isSupported: (type: string) => boolean): str
   return AUDIO_MIME_TYPES.find(isSupported) || '';
 }
 
-export function createAudioRecorder(stream: MediaStream): MediaRecorder {
+export function createAudioRecorder(
+  stream: MediaStream,
+  onConfigured?: (options: MediaRecorderOptions, attempts: number) => void
+): MediaRecorder {
   const mimeType = selectAudioMimeType((type) =>
     typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported(type)
   );
-  const format = mimeType ? { mimeType } : {};
-  try {
-    return new MediaRecorder(stream, { ...format, audioBitsPerSecond: AUDIO_BITS_PER_SECOND });
-  } catch {
-    // Some implementations reject bitrate options. Retain the negotiated format first.
+  // For this audio-only stream, total bitrate is another standard way to request
+  // the same target. Try it before silently accepting the encoder's default.
+  const candidates: (MediaRecorderOptions | undefined)[] = [
+    ...(mimeType ? [
+      { mimeType, audioBitsPerSecond: AUDIO_BITS_PER_SECOND },
+      { mimeType, bitsPerSecond: AUDIO_BITS_PER_SECOND },
+      { mimeType },
+    ] : []),
+    { audioBitsPerSecond: AUDIO_BITS_PER_SECOND },
+    { bitsPerSecond: AUDIO_BITS_PER_SECOND },
+    undefined,
+  ];
+  let lastError: unknown;
+  for (const [index, options] of candidates.entries()) {
+    let recorder: MediaRecorder;
     try {
-      return new MediaRecorder(stream, format);
-    } catch {
-      // Capability probes are advisory; let the browser select its native encoder.
-      try {
-        return new MediaRecorder(stream, { audioBitsPerSecond: AUDIO_BITS_PER_SECOND });
-      } catch {
-        return new MediaRecorder(stream);
-      }
+      recorder = options ? new MediaRecorder(stream, options) : new MediaRecorder(stream);
+    } catch (error) {
+      lastError = error;
+      continue;
     }
+    onConfigured?.({ ...options }, index + 1);
+    return recorder;
   }
+  throw lastError;
 }
 
 /** The caller owns the successful result's object URL and must revoke it when done. */
@@ -126,13 +150,24 @@ export async function startAudioRecording(
     throw new Error('Tu navegador no permite grabar audio.');
   }
   const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    audio: {
+      // A voice note does not need stereo. Ideal allows devices to fall back.
+      channelCount: { ideal: 1 },
+      echoCancellation: true, noiseSuppression: true, autoGainControl: true,
+    },
   });
   const stopTracks = () => stream.getTracks().forEach((track) => track.stop());
   let mediaRecorder: MediaRecorder;
+  let constructorOptions: MediaRecorderOptions = {};
+  let constructorAttempts = 0;
+  let trackSettings: MediaTrackSettings | undefined;
   try {
     if (signal?.aborted || (typeof document !== 'undefined' && document.hidden)) throw abortError();
-    mediaRecorder = createAudioRecorder(stream);
+    trackSettings = stream.getAudioTracks()[0]?.getSettings?.();
+    mediaRecorder = createAudioRecorder(stream, (options, attempts) => {
+      constructorOptions = options;
+      constructorAttempts = attempts;
+    });
   } catch (error) {
     stopTracks();
     throw error;
@@ -210,6 +245,19 @@ export async function startAudioRecording(
     try {
       const actualMimeType = mediaRecorder.mimeType || chunks.find((chunk) => chunk.type)?.type || '';
       const audioBlob = new Blob(chunks, { type: actualMimeType });
+      const elapsedSeconds = (stoppedAt - startTime) / 1000;
+      const diagnostics: AudioRecordingDiagnostics = {
+        constructorOptions,
+        constructorAttempts,
+        // This browser getter is not a measurement of the encoded file's bitrate.
+        reportedAudioBitsPerSecond: Number.isFinite(mediaRecorder.audioBitsPerSecond)
+          ? mediaRecorder.audioBitsPerSecond : null,
+        channelCount: trackSettings?.channelCount ?? null,
+        sampleRate: trackSettings?.sampleRate ?? null,
+        elapsedSeconds,
+        effectiveBitsPerSecond: elapsedSeconds > 0 ? audioBlob.size * 8 / elapsedSeconds : 0,
+        chunkCount: chunks.length,
+      };
       chunks.length = 0;
       const base64Audio = await blobToBase64(audioBlob);
       if (transcriptionController.signal.aborted) return;
@@ -232,7 +280,7 @@ export async function startAudioRecording(
       const audioUrl = URL.createObjectURL(audioBlob);
       phase = 'finished';
       detach();
-      resolveResult({ audioBlob, audioUrl, base64Audio, transcript,
+      resolveResult({ audioBlob, audioUrl, base64Audio, transcript, diagnostics,
         durationSeconds: Math.max(1, Math.round((stoppedAt - startTime) / 1000)) });
     } catch (error) { fail(error); }
   };
@@ -297,7 +345,9 @@ export async function startAudioRecording(
   } catch { /* Speech recognition is optional. */ }
 
   try {
-    mediaRecorder.start(250);
+    // The bounded note is consumed only after Stop; no streaming consumer needs
+    // timeslices. Avoid forcing frequent encoder flushes/container clusters.
+    mediaRecorder.start();
     startTime = performance.now();
     timer = setTimeout(() => { void stop('limit'); }, MAX_RECORDING_SECONDS * 1000);
     signal?.addEventListener('abort', cancel, { once: true });

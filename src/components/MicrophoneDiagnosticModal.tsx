@@ -338,6 +338,19 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
               <p className="text-xs text-emerald-900 break-all">
                 {testResult.audioBlob.size} bytes · {testResult.audioBlob.type || 'Formato nativo'}
               </p>
+              <div className="text-xs text-emerald-900 break-all space-y-1">
+                <p>Perfil: voz mono solicitada, sin bloques periódicos</p>
+                <p>Opciones aceptadas: {JSON.stringify(testResult.diagnostics.constructorOptions)}</p>
+                <p>Intentos del constructor: {testResult.diagnostics.constructorAttempts}</p>
+                <p>MediaRecorder.audioBitsPerSecond: {testResult.diagnostics.reportedAudioBitsPerSecond ?? 'No disponible'}</p>
+                <p>Captura: {testResult.diagnostics.channelCount ?? '?'} canal(es), {testResult.diagnostics.sampleRate ?? '?'} Hz</p>
+                <p>Tiempo: {testResult.diagnostics.elapsedSeconds.toFixed(3)} s · Archivo: {Math.round(testResult.diagnostics.effectiveBitsPerSecond)} bits/s · {testResult.diagnostics.chunkCount} bloques</p>
+                <p>La tasa reportada por el navegador no garantiza el tamaño del archivo.</p>
+                <a className="underline" href={testResult.audioUrl}
+                  download={`raiz-audio.${testResult.audioBlob.type.includes('webm') ? 'webm' : testResult.audioBlob.type.includes('ogg') ? 'ogg' : testResult.audioBlob.type.includes('mp4') ? 'm4a' : 'bin'}`}>
+                  Descargar grabación
+                </a>
+              </div>
 
               {/* Play recorded voice */}
               <div className="flex items-center gap-2">

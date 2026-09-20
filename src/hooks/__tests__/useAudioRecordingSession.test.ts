@@ -5,6 +5,7 @@ import { createRoot, Root } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import { useAudioRecordingSession } from '../useAudioRecordingSession';
 import { RegisterCoffeeLotScreen } from '../../components/RegisterCoffeeLotScreen';
+import { MicrophoneDiagnosticModal } from '../../components/MicrophoneDiagnosticModal';
 
 let dom: JSDOM;
 let root: Root;
@@ -37,6 +38,7 @@ beforeEach(() => {
   global('MediaRecorder', class {
     static isTypeSupported() { return true; }
     mimeType = 'audio/webm;codecs=opus';
+    audioBitsPerSecond = 24_000;
     state = 'inactive';
     ondataavailable: any;
     onstop: any;
@@ -137,4 +139,19 @@ test('registration manual double Stop before deadline produces a single saved no
   assert.equal(created, 1);
   assert.equal(stopped, 1);
   assert.doesNotMatch(document.body.textContent!, /Grabación detenida automáticamente/);
+});
+
+test('microphone diagnostic renders the browser bitrate and accepted options with a local download', async () => {
+  await act(async () => root.render(React.createElement(MicrophoneDiagnosticModal, { isOpen: true, onClose: () => {} })));
+  const button = (label: string) => Array.from(document.querySelectorAll('button'))
+    .find((element) => element.textContent?.includes(label)) as HTMLButtonElement;
+  await act(async () => button('Probar').click());
+  await act(async () => { now = 5_000; button('Detener').click(); });
+  assert.match(document.body.textContent!, /MediaRecorder.audioBitsPerSecond: 24000/);
+  assert.match(document.body.textContent!, /"audioBitsPerSecond":24000/);
+  assert.match(document.body.textContent!, /Intentos del constructor: 1/);
+  assert.match(document.body.textContent!, /Tiempo: 5.000 s/);
+  assert.match(document.body.textContent!, /no garantiza el tamaño del archivo/);
+  assert.equal(document.querySelector('a[download]')?.getAttribute('href'), 'blob:test-1');
+  assert.equal(document.querySelector('a[download]')?.getAttribute('download'), 'raiz-audio.webm');
 });
