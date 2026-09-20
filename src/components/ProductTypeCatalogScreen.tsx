@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useAudioRecordingSession } from '../hooks/useAudioRecordingSession';
 import { AppLanguage, ScreenView } from '../types';
-import { startAudioRecording, LiveRecorderSession } from '../utils/audioRecorder';
+import { LiveRecorderSession } from '../utils/audioRecorder';
 import { sanitizeProductName } from '../utils/productUtils';
 
 interface ProductTypeCatalogScreenProps {
@@ -20,7 +21,7 @@ export const ProductTypeCatalogScreen: React.FC<ProductTypeCatalogScreenProps> =
   const [selectedItem, setSelectedItem] = useState<string>('Café');
   const [inputText, setInputText] = useState<string>('');
   const [isRecording, setIsRecording] = useState<boolean>(false);
-  const [audioVolume, setAudioVolume] = useState<number>(0);
+  const { startRecording, audioLevel: audioVolume } = useAudioRecordingSession();
   const [liveTranscript, setLiveTranscript] = useState<string>('');
   const [micStatusMessage, setMicStatusMessage] = useState<string | null>(null);
 
@@ -236,15 +237,15 @@ export const ProductTypeCatalogScreen: React.FC<ProductTypeCatalogScreenProps> =
     return t.replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, '').trim();
   }
 
-  const toggleVoiceRecording = async () => {
-    if (isRecording) {
+  const toggleVoiceRecording = async (automatic = false) => {
+    if (isRecording || automatic) {
       // STOP recording
       setIsRecording(false);
-      setAudioVolume(0);
       if (recorderSessionRef.current) {
         try {
-          const result = await recorderSessionRef.current.stop();
+          const session = recorderSessionRef.current;
           recorderSessionRef.current = null;
+          const result = await session.stop();
           const transcriptToEvaluate = (result.transcript || liveTranscript || '').trim();
           const matched = matchProductFromVoice(transcriptToEvaluate);
           if (matched) {
@@ -264,6 +265,7 @@ export const ProductTypeCatalogScreen: React.FC<ProductTypeCatalogScreenProps> =
             setMicStatusMessage('Audio grabado. Habla claro o di el nombre del producto (ej. "Pulque", "Café").');
           }
         } catch (e: any) {
+          if (e?.name === 'AbortError') return;
           console.error(e);
           setMicStatusMessage('Error al procesar el audio del micrófono.');
         }
@@ -273,8 +275,10 @@ export const ProductTypeCatalogScreen: React.FC<ProductTypeCatalogScreenProps> =
       setMicStatusMessage(null);
       setLiveTranscript('');
       try {
-        const session = await startAudioRecording({
-          onVolumeChange: (vol) => setAudioVolume(vol),
+        const session = await startRecording({
+          onStopped: (reason) => {
+            if (reason === 'limit' || reason === 'hidden' || reason === 'ended' || reason === 'error') void toggleVoiceRecording(true);
+          },
           onInterimTranscript: (text) => {
             setLiveTranscript(text);
             const matched = matchProductFromVoice(text);
@@ -287,6 +291,7 @@ export const ProductTypeCatalogScreen: React.FC<ProductTypeCatalogScreenProps> =
         recorderSessionRef.current = session;
         setIsRecording(true);
       } catch (err: any) {
+        if (err?.name === 'AbortError') return;
         console.warn('Error accediendo al micrófono:', err);
         setIsRecording(false);
         setMicStatusMessage(
@@ -492,7 +497,7 @@ export const ProductTypeCatalogScreen: React.FC<ProductTypeCatalogScreenProps> =
 
           <button
             type="button"
-            onClick={toggleVoiceRecording}
+            onClick={() => toggleVoiceRecording()}
             className={`rounded-full font-bold text-white transition-all active:scale-95 shrink-0 shadow-xs cursor-pointer flex items-center gap-1.5 ${
               elderMode ? 'px-5 py-3 text-[15px] min-h-[50px]' : 'px-4 py-2 text-[13px]'
             } ${

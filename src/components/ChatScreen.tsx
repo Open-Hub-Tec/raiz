@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useAudioRecordingSession } from '../hooks/useAudioRecordingSession';
 import { ScreenView, BotCardData, BotCardType, DigitalPassportLot } from '../types';
 import { BotCardView } from './BotCardView';
 import { KnowledgeBaseModal } from './KnowledgeBaseModal';
-import { startAudioRecording, LiveRecorderSession } from '../utils/audioRecorder';
+import { LiveRecorderSession } from '../utils/audioRecorder';
 
 interface ChatScreenProps {
   onNavigateScreen: (screen: ScreenView, productType?: string) => void;
@@ -57,7 +58,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingSeconds, setRecordingSeconds] = useState<number>(0);
-  const [audioVolume, setAudioVolume] = useState<number>(0);
+  const { startRecording, audioLevel: audioVolume } = useAudioRecordingSession();
   const [liveVoiceTranscript, setLiveVoiceTranscript] = useState<string>('');
   const [micError, setMicError] = useState<string | null>(null);
   const [showCardPicker, setShowCardPicker] = useState<boolean>(false);
@@ -959,8 +960,10 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     setMicError(null);
     setLiveVoiceTranscript('');
     try {
-      const session = await startAudioRecording({
-        onVolumeChange: (vol) => setAudioVolume(vol),
+      const session = await startRecording({
+        onStopped: (reason) => {
+          if (reason === 'limit' || reason === 'hidden' || reason === 'ended' || reason === 'error') void stopVoiceRecording();
+        },
         onInterimTranscript: (text) => setLiveVoiceTranscript(text),
         lang: 'es-MX',
       });
@@ -968,6 +971,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       setIsRecording(true);
       setRecordingSeconds(0);
     } catch (err: any) {
+      if (err?.name === 'AbortError') return;
       console.warn('Micrófono denegado o no disponible:', err);
       setIsRecording(false);
       setMicError(
@@ -983,11 +987,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     }
 
     setIsRecording(false);
-    setAudioVolume(0);
 
     try {
-      const result = await chatAudioSessionRef.current.stop();
+      const session = chatAudioSessionRef.current;
       chatAudioSessionRef.current = null;
+      const result = await session.stop();
 
       const durationSec = result.durationSeconds || Math.max(1, recordingSeconds);
       const formattedDuration = `0:${durationSec < 10 ? '0' : ''}${durationSec}`;
@@ -1061,6 +1065,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         700
       );
     } catch (e: any) {
+      if (e?.name === 'AbortError') return;
       console.error('Error al finalizar grabación:', e);
       setIsRecording(false);
     }
@@ -1072,7 +1077,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       chatAudioSessionRef.current = null;
     }
     setIsRecording(false);
-    setAudioVolume(0);
     setLiveVoiceTranscript('');
   };
 

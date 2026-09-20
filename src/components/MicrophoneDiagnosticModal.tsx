@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useAudioRecordingSession } from '../hooks/useAudioRecordingSession';
 import {
-  startAudioRecording,
   LiveRecorderSession,
   getMicrophoneCapabilities,
   AudioRecordingResult
@@ -27,7 +27,7 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
 
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [testSeconds, setTestSeconds] = useState<number>(0);
-  const [liveVolume, setLiveVolume] = useState<number>(0);
+  const { startRecording, audioLevel: liveVolume } = useAudioRecordingSession(isOpen);
   const [liveSpokenText, setLiveSpokenText] = useState<string>('');
   const [testResult, setTestResult] = useState<AudioRecordingResult | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
@@ -45,17 +45,18 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
       timerRef.current = null;
     }
     setIsTesting(false);
-    setLiveVolume(0);
 
     if (sessionRef.current) {
       try {
-        const res = await sessionRef.current.stop();
+        const session = sessionRef.current;
         sessionRef.current = null;
+        const res = await session.stop();
         setTestResult(res);
         if (res.transcript) {
           setAiTranscript(res.transcript);
         }
       } catch (err: any) {
+        if (err?.name === 'AbortError') return;
         console.error('Error al detener sesión:', err);
         setErrorMessage('Hubo un problema al procesar el audio grabado.');
       }
@@ -68,23 +69,24 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
     setAiTranscript(null);
     setLiveSpokenText('');
     setTestSeconds(0);
-    setLiveVolume(0);
-
-    timerRef.current = setInterval(() => {
-      setTestSeconds((s) => s + 1);
-    }, 1000);
 
     try {
-      const session = await startAudioRecording({
-        onVolumeChange: (vol) => setLiveVolume(vol),
+      const session = await startRecording({
+        onStopped: (reason) => {
+          if (reason === 'limit' || reason === 'hidden' || reason === 'ended' || reason === 'error') void handleStopTest();
+        },
         onInterimTranscript: (text) => setLiveSpokenText(text),
         lang: 'es-MX'
       });
       sessionRef.current = session;
+      timerRef.current = setInterval(() => {
+        setTestSeconds((s) => s + 1);
+      }, 1000);
       setIsTesting(true);
       // Re-check permissions
       getMicrophoneCapabilities().then(setCapabilities);
     } catch (err: any) {
+      if (err?.name === 'AbortError') return;
       console.warn('Error al iniciar prueba de micro:', err);
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -131,7 +133,7 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           audioBase64: testResult.base64Audio,
-          mimeType: testResult.audioBlob.type || 'audio/webm'
+          mimeType: testResult.audioBlob.type
         })
       });
 
@@ -154,7 +156,12 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
     if (isOpen) {
       getMicrophoneCapabilities().then(setCapabilities);
     } else {
-      handleStopTest();
+      sessionRef.current?.cancel();
+      sessionRef.current = null;
+      setTestResult(null);
+      setAiTranscript(null);
+      if (timerRef.current) clearInterval(timerRef.current);
+      setIsTesting(false);
       if (audioElementRef.current) {
         audioElementRef.current.pause();
       }
@@ -327,6 +334,10 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
                   OK
                 </span>
               </div>
+
+              <p className="text-xs text-emerald-900 break-all">
+                {testResult.audioBlob.size} bytes · {testResult.audioBlob.type || 'Formato nativo'}
+              </p>
 
               {/* Play recorded voice */}
               <div className="flex items-center gap-2">
