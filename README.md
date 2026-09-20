@@ -153,10 +153,9 @@ Integration with **Stellar Anchors (SEP-24 / SEP-38)** to allow global buyers to
 
 **Raíz** is structured to leverage **Drips Protocol** streaming mechanics for long-term open-source sustainability:
 
-- **Transparent Splits Model**: All incoming Drips streams and donations are programmatically routed:
-  - **70%**: Undergraduate scholarship stipends and development hardware for student engineers at TecNM Campus Tlaxiaco.
-  - **20%**: Field research hardware (smartphones, IoT digital scales, refractometers for rural pilot cooperatives).
-  - **10%**: Stellar Mainnet deployment reserve and transaction fee pool.
+- **Transparent Splits Model**: All incoming Drips streams and donations are programmatically routed exclusively to contributors:
+  - **80%**: Undergraduate student engineering stipends (Proof of Work based on merged PRs, field validation milestones, and code delivery) at TecNM Campus Tlaxiaco.
+  - **20%**: Lead maintainer and technical architecture direction (code reviews, Soroban smart contract architecture, sprint scoping, and student mentorship).
 - **Dependency & Open Contribution**: All contract code, documentation, and client modules remain fully public and forkable on GitHub.
 
 ---

@@ -11,15 +11,15 @@
     "totalStudents": 60
   },
   "splitsRules": {
-    "description": "Distribución 55% Estudiantes (Proof of Work) / 20% Mantenedor Principal (Arquitectura y Mentoría) / 15% Operación de Campo / 10% Infraestructura",
+    "description": "Distribución exclusiva: 80% Estudiantes Investigadores (Proof of Work) / 20% Mantenedor Principal (Arquitectura, Mentoría y Revisión de Código)",
     "totalPercentage": 100,
     "unallocatedFundsPolicy": "Los fondos correspondientes a estudiantes sin contribución verificada (sin commits ni issues resueltos) NO se pierden ni se retienen en una wallet privada: se acumulan automáticamente en el Fondo Común de Reserva Estudiantil para becas de titulación y hardware de laboratorio.",
     "splits": [
       {
         "category": "Estudiantes Investigadores (Proof of Work)",
-        "percentage": 55,
+        "percentage": 80,
         "recipientType": "drips_multisig_or_stream",
-        "description": "55% del fondo total dividido equitativamente entre los estudiantes con aportes comprobables en GitHub (código, pruebas de usabilidad, levantamiento de campo).",
+        "description": "80% del fondo total de Drips dividido entre los estudiantes con aportes comprobables en GitHub (código, pruebas de usabilidad, investigación y levantamiento de campo).",
         "distributionMethod": "Merit-based GitHub PR/Issue milestone validation (Semanal/Quincenal)",
         "inactivityRule": "Si un estudiante no registra actividad, su cuota permanece en el smart contract de Drips bajo el pool estudiantil y se reasigna a los estudiantes más activos o al fondo de titulación."
       },
@@ -34,20 +34,6 @@
           "Delimitación de Issues para los ciclos de sprint de Drips Wave",
           "Coordinación académica con TecNM y enlace institucional con Drips/Stellar"
         ]
-      },
-      {
-        "category": "Operación de Campo y Viáticos en Comunidades",
-        "percentage": 15,
-        "recipientType": "multisig_committee",
-        "description": "15% destinado a transporte, traslados a comunidades de la Mixteca Alta (Yucuhiti, Atatlahuca, Peñasco), materiales didácticos impresos y refrigerios para los 50 artesanos en talleres comunitarios.",
-        "accountability": "Comprobación mediante bitácoras de campo y firmas de comités comunitarios"
-      },
-      {
-        "category": "Infraestructura, Conectividad y Licencias",
-        "percentage": 10,
-        "recipientType": "tech_infrastructure_pool",
-        "description": "10% para servidores, dominios, infraestructura offline (routers portátiles de malla, tarjetas SIM de prueba en campo) y mantenimiento del laboratorio de sistemas.",
-        "accountability": "Reporte público en el repositorio Open-Hub-Tec/raiz"
       }
     ]
   },
