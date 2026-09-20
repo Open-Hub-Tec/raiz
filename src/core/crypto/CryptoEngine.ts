@@ -1,49 +1,102 @@
 /**
- * Raíz Core - Motor Criptográfico de Integridad
- * Calcula identificadores únicos y hashes SHA-256 inmutables
- * para fotos, audios testimoniales y dictámenes técnicos.
+ * Raíz Core - Motor Criptográfico de Integridad.
+ *
+ * The digest format deliberately uses canonical JSON.  JSON.stringify's
+ * insertion-order behavior is not a portable wire format: two callers can
+ * provide the same object with different key order and produce different
+ * hashes.  Sorting keys here makes the digest reproducible across browsers,
+ * Node, and CI.
  */
 
-export class CryptoEngine {
-  /**
-   * Calcula el hash SHA-256 de una cadena de texto o base64 (audios, fotos)
-   */
-  public static async computeSha256(data: string): Promise<string> {
-    if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
-      try {
-        const encoder = new TextEncoder();
-        const dataBuffer = encoder.encode(data);
-        const hashBuffer = await window.crypto.subtle.digest('SHA-256', dataBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-      } catch (e) {
-        console.warn('Fallback SHA-256 calculation:', e);
-      }
-    }
-    // Fallback deterministic hash for offline or restricted container environments
-    let hash = 0;
-    for (let i = 0; i < data.length; i++) {
-      const char = data.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash |= 0;
-    }
-    return Math.abs(hash).toString(16).padStart(64, '0');
+export type BinaryInput = string | Uint8Array | ArrayBuffer;
+
+export interface LotDigestInput {
+  producerName: string;
+  community?: string;
+  parcelLocation?: string;
+  audio?: BinaryInput;
+  photo?: BinaryInput;
+  /** Legacy aliases retained for callers already using the public API. */
+  audioBase64?: string;
+  photoBase64?: string;
+  timestamp: number;
+  latitude?: number;
+  longitude?: number;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  if (typeof btoa === 'function') {
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
   }
 
-  /**
-   * Genera el Digest de Autenticidad comunitaria combinando:
-   * 1. Audio testimonial del campesino(a)
-   * 2. Fotografía del lote o prenda
-   * 3. Coordenadas y marca de tiempo
-   */
-  public static async generateCommunityDigest(params: {
-    producerName: string;
-    community: string;
-    timestamp: number;
-    audioBase64?: string;
-    photoBase64?: string;
-  }): Promise<string> {
-    const payload = `${params.producerName}|${params.community}|${params.timestamp}|${params.audioBase64?.slice(0, 100) || 'no_audio'}|${params.photoBase64?.slice(0, 100) || 'no_photo'}`;
-    return this.computeSha256(payload);
+  // Node fallback; this branch is never evaluated by browser builds.
+  return Buffer.from(bytes).toString('base64');
+}
+
+function canonicalValue(value: unknown): unknown {
+  if (value instanceof Uint8Array) {
+    return { __binary: bytesToBase64(value) };
+  }
+  if (value instanceof ArrayBuffer) {
+    return { __binary: bytesToBase64(new Uint8Array(value)) };
+  }
+  if (Array.isArray(value)) return value.map(canonicalValue);
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, child]) => child !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, child]) => [key, canonicalValue(child)]),
+    );
+  }
+  return value;
+}
+
+export function canonicalizeLotPayload(input: LotDigestInput): string {
+  return JSON.stringify(canonicalValue(input));
+}
+
+function toBytes(data: BinaryInput): Uint8Array {
+  if (typeof data === 'string') return new TextEncoder().encode(data);
+  if (data instanceof Uint8Array) return data;
+  return new Uint8Array(data);
+}
+
+function toHex(bytes: Uint8Array): string {
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export class CryptoEngine {
+  /** Compute a real SHA-256 digest, never a non-cryptographic placeholder. */
+  public static async computeSha256(data: BinaryInput): Promise<string> {
+    const bytes = toBytes(data);
+    const subtle = globalThis.crypto?.subtle;
+
+    if (subtle) {
+      const hash = await subtle.digest('SHA-256', bytes);
+      return toHex(new Uint8Array(hash));
+    }
+
+    // Node environments without globalThis.crypto (older Node or restricted
+    // test runners) use the platform implementation instead of a weak hash.
+    const { createHash } = await import('node:crypto');
+    return createHash('sha256').update(bytes).digest('hex');
+  }
+
+  /** Generate a deterministic digest for a complete lot provenance payload. */
+  public static async generateCommunityDigest(input: LotDigestInput): Promise<string> {
+    const { audioBase64, photoBase64, ...rest } = input;
+    const normalized: LotDigestInput = {
+      ...rest,
+      audio: input.audio ?? audioBase64,
+      photo: input.photo ?? photoBase64,
+    };
+    return this.computeSha256(canonicalizeLotPayload(normalized));
   }
 }
