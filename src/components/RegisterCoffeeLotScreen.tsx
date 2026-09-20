@@ -61,7 +61,7 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
   const voiceActionRef = useRef(false);
   const [autoStopMessage, setAutoStopMessage] = useState<string | null>(null);
   const [recordSeconds, setRecordSeconds] = useState<number>(0);
-  const { startRecording, audioLevel: audioVolume } = useAudioRecordingSession();
+  const { startRecording, audioLevel: audioVolume, releaseAudioUrl } = useAudioRecordingSession();
   const [liveVoiceTranscript, setLiveVoiceTranscript] = useState<string>('');
   const [recordedAudioNote, setRecordedAudioNote] = useState<{
     audioUrl: string;
@@ -190,10 +190,6 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
         }
       } else {
         // START recording
-        setAutoStopMessage(null);
-        setRecordSeconds(0);
-        setLiveVoiceTranscript('');
-        setVoiceToast(null);
         try {
           const session = await startRecording({
             onStopped: (reason) => {
@@ -204,6 +200,10 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
             onInterimTranscript: (text) => setLiveVoiceTranscript(text),
             lang: 'es-MX',
           });
+          setAutoStopMessage(null);
+          setRecordSeconds(0);
+          setLiveVoiceTranscript('');
+          setVoiceToast(null);
           audioSessionRef.current = session;
           setIsRecording(true);
         } catch (err: any) {
@@ -223,9 +223,9 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
 
   useEffect(() => {
     return () => {
-      if (recordedAudioNote?.audioUrl) URL.revokeObjectURL(recordedAudioNote.audioUrl);
+      if (recordedAudioNote?.audioUrl) releaseAudioUrl(recordedAudioNote.audioUrl);
     };
-  }, [recordedAudioNote?.audioUrl]);
+  }, [recordedAudioNote?.audioUrl, releaseAudioUrl]);
 
   const toggleAudioPlayback = () => {
     if (!recordedAudioNote?.audioUrl) return;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { startAudioRecording, StartRecordingOptions, LiveRecorderSession } from '../utils/audioRecorder';
 import { useAudioLevelMeter } from './useAudioLevelMeter';
 
@@ -9,6 +9,10 @@ export function useAudioRecordingSession(active = true) {
   const urls = useRef(new Set<string>());
   const mounted = useRef(false);
   const audioLevel = useAudioLevelMeter(stream);
+
+  const releaseAudioUrl = useCallback((url: string) => {
+    if (urls.current.delete(url)) URL.revokeObjectURL(url);
+  }, []);
 
   useEffect(() => {
     mounted.current = active;
@@ -55,5 +59,5 @@ export function useAudioRecordingSession(active = true) {
       throw error;
     }
   };
-  return { startRecording, audioLevel };
+  return { startRecording, audioLevel, releaseAudioUrl };
 }

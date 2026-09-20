@@ -11,6 +11,8 @@ interface MicrophoneDiagnosticModalProps {
   onClose: () => void;
 }
 
+const DIAGNOSTIC_RECORDING_SECONDS = 30;
+
 export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps> = ({
   isOpen,
   onClose
@@ -27,7 +29,7 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
 
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [testSeconds, setTestSeconds] = useState<number>(0);
-  const { startRecording, audioLevel: liveVolume } = useAudioRecordingSession(isOpen);
+  const { startRecording, audioLevel: liveVolume, releaseAudioUrl } = useAudioRecordingSession(isOpen);
   const [liveSpokenText, setLiveSpokenText] = useState<string>('');
   const [testResult, setTestResult] = useState<AudioRecordingResult | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
@@ -37,12 +39,17 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
 
   const sessionRef = useRef<LiveRecorderSession | null>(null);
   const timerRef = useRef<any>(null);
+  const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
   const handleStopTest = async () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
+    }
+    if (stopTimerRef.current) {
+      clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
     }
     setIsTesting(false);
 
@@ -64,12 +71,6 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
   };
 
   const handleStartTest = async () => {
-    setErrorMessage(null);
-    setTestResult(null);
-    setAiTranscript(null);
-    setLiveSpokenText('');
-    setTestSeconds(0);
-
     try {
       const session = await startRecording({
         onStopped: (reason) => {
@@ -78,10 +79,18 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
         onInterimTranscript: (text) => setLiveSpokenText(text),
         lang: 'es-MX'
       });
+      setErrorMessage(null);
+      setTestResult(null);
+      setAiTranscript(null);
+      setLiveSpokenText('');
+      setTestSeconds(0);
       sessionRef.current = session;
       timerRef.current = setInterval(() => {
-        setTestSeconds((s) => s + 1);
+        setTestSeconds((s) => Math.min(DIAGNOSTIC_RECORDING_SECONDS, s + 1));
       }, 1000);
+      stopTimerRef.current = setTimeout(() => {
+        void handleStopTest();
+      }, DIAGNOSTIC_RECORDING_SECONDS * 1000);
       setIsTesting(true);
       // Re-check permissions
       getMicrophoneCapabilities().then(setCapabilities);
@@ -161,6 +170,9 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
       setTestResult(null);
       setAiTranscript(null);
       if (timerRef.current) clearInterval(timerRef.current);
+      if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+      timerRef.current = null;
+      stopTimerRef.current = null;
       setIsTesting(false);
       if (audioElementRef.current) {
         audioElementRef.current.pause();
@@ -173,9 +185,16 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
     return () => {
       if (sessionRef.current) sessionRef.current.cancel();
       if (timerRef.current) clearInterval(timerRef.current);
+      if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
       if (audioElementRef.current) audioElementRef.current.pause();
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (testResult?.audioUrl) releaseAudioUrl(testResult.audioUrl);
+    };
+  }, [testResult?.audioUrl, releaseAudioUrl]);
 
   if (!isOpen) return null;
 
@@ -271,7 +290,7 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
 
           <p className="text-[12px] text-[#424843]">
             {isTesting
-              ? '🎤 Habla ahora: di "Opción 4", "Café de Especialidad" o "Hola Raíz"'
+              ? '🎤 Habla de forma continua. La prueba se detendrá automáticamente a los 30 segundos.'
               : 'Presiona el botón verde para hablar y medir la sensibilidad del micrófono.'}
           </p>
 
@@ -283,18 +302,18 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
                   <span className="font-mono font-bold text-red-300">
                     0:{testSeconds < 10 ? '0' : ''}
-                    {testSeconds}
+                    {testSeconds} / 0:{DIAGNOSTIC_RECORDING_SECONDS}
                   </span>
                   <span className="text-emerald-200">Grabando señal de audio...</span>
                 </div>
-                <span className="font-mono text-emerald-300 font-bold">{liveVolume}% dB</span>
+                <span className="font-mono text-emerald-300 font-bold">Nivel relativo: {liveVolume}%</span>
               </div>
 
               {/* Dynamic VU meter bar */}
               <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-linear-to-r from-emerald-400 via-yellow-400 to-red-400 transition-all duration-75"
-                  style={{ width: `${Math.max(6, liveVolume)}%` }}
+                  style={{ width: `${liveVolume}%` }}
                 />
               </div>
 
@@ -305,7 +324,7 @@ export const MicrophoneDiagnosticModal: React.FC<MicrophoneDiagnosticModalProps>
                     key={i}
                     className="w-1 bg-emerald-300 rounded-full transition-all duration-100"
                     style={{
-                      height: `${Math.max(6, Math.min(32, (h * (liveVolume + 15)) / 45))}px`
+                      height: `${Math.max(2, Math.min(32, (h * liveVolume) / 100))}px`
                     }}
                   />
                 ))}

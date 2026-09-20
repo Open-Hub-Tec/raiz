@@ -21,7 +21,7 @@ export const ProductTypeCatalogScreen: React.FC<ProductTypeCatalogScreenProps> =
   const [selectedItem, setSelectedItem] = useState<string>('Café');
   const [inputText, setInputText] = useState<string>('');
   const [isRecording, setIsRecording] = useState<boolean>(false);
-  const { startRecording, audioLevel: audioVolume } = useAudioRecordingSession();
+  const { startRecording, audioLevel: audioVolume, releaseAudioUrl } = useAudioRecordingSession();
   const [liveTranscript, setLiveTranscript] = useState<string>('');
   const [micStatusMessage, setMicStatusMessage] = useState<string | null>(null);
 
@@ -247,6 +247,7 @@ export const ProductTypeCatalogScreen: React.FC<ProductTypeCatalogScreenProps> =
           recorderSessionRef.current = null;
           const result = await session.stop();
           const transcriptToEvaluate = (result.transcript || liveTranscript || '').trim();
+          releaseAudioUrl(result.audioUrl);
           const matched = matchProductFromVoice(transcriptToEvaluate);
           if (matched) {
             const clean = sanitizeProductName(matched);
@@ -272,8 +273,6 @@ export const ProductTypeCatalogScreen: React.FC<ProductTypeCatalogScreenProps> =
       }
     } else {
       // START recording
-      setMicStatusMessage(null);
-      setLiveTranscript('');
       try {
         const session = await startRecording({
           onStopped: (reason) => {
@@ -288,6 +287,8 @@ export const ProductTypeCatalogScreen: React.FC<ProductTypeCatalogScreenProps> =
           },
           lang: 'es-MX',
         });
+        setMicStatusMessage(null);
+        setLiveTranscript('');
         recorderSessionRef.current = session;
         setIsRecording(true);
       } catch (err: any) {
@@ -523,7 +524,7 @@ export const ProductTypeCatalogScreen: React.FC<ProductTypeCatalogScreenProps> =
             <div className="flex-1 h-2 bg-[#e4e2dc] rounded-full overflow-hidden">
               <div
                 className="h-full bg-linear-to-r from-emerald-500 via-amber-500 to-red-500 transition-all duration-75 rounded-full"
-                style={{ width: `${Math.max(8, audioVolume)}%` }}
+                style={{ width: `${audioVolume}%` }}
               />
             </div>
             <span className="text-[10px] font-mono text-[#424843]">{audioVolume}%</span>

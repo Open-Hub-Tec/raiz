@@ -29,7 +29,7 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
   const [numericInput, setNumericInput] = useState('');
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingSeconds, setRecordingSeconds] = useState<number>(0);
-  const { startRecording, audioLevel: audioVolume } = useAudioRecordingSession();
+  const { startRecording, audioLevel: audioVolume, releaseAudioUrl } = useAudioRecordingSession();
   const [liveTranscript, setLiveTranscript] = useState<string>('');
   const [micStatusMessage, setMicStatusMessage] = useState<string | null>(null);
   const [recognizedOptionToast, setRecognizedOptionToast] = useState<string | null>(null);
@@ -165,6 +165,7 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
           recorderSessionRef.current = null;
           const result = await session.stop();
           const transcriptToEvaluate = (result.transcript || liveTranscript || '').trim();
+          releaseAudioUrl(result.audioUrl);
           const matched = matchMainMenuOption(transcriptToEvaluate);
 
           if (matched) {
@@ -184,11 +185,6 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
       }
     } else {
       // START recording
-      setMicStatusMessage(null);
-      setRecognizedOptionToast(null);
-      setLiveTranscript('');
-      setRecordingSeconds(0);
-
       try {
         const session = await startRecording({
           onStopped: (reason) => {
@@ -210,6 +206,10 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
           },
           lang: 'es-MX',
         });
+        setMicStatusMessage(null);
+        setRecognizedOptionToast(null);
+        setLiveTranscript('');
+        setRecordingSeconds(0);
         recorderSessionRef.current = session;
         timerRef.current = setInterval(() => {
           setRecordingSeconds((sec) => sec + 1);
@@ -472,7 +472,7 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
               <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-linear-to-r from-emerald-400 via-yellow-400 to-red-400 transition-all duration-75"
-                  style={{ width: `${Math.max(8, audioVolume)}%` }}
+                  style={{ width: `${audioVolume}%` }}
                 />
               </div>
               <span className="text-[10px] font-mono text-emerald-200">{audioVolume}%</span>

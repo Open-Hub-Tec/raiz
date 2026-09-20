@@ -957,8 +957,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
   // Real Audio Recording with Web Speech API and Gemini Transcription
   const startVoiceRecording = async () => {
-    setMicError(null);
-    setLiveVoiceTranscript('');
     try {
       const session = await startRecording({
         onStopped: (reason) => {
@@ -967,6 +965,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         onInterimTranscript: (text) => setLiveVoiceTranscript(text),
         lang: 'es-MX',
       });
+      setMicError(null);
+      setLiveVoiceTranscript('');
       chatAudioSessionRef.current = session;
       setIsRecording(true);
       setRecordingSeconds(0);
@@ -2411,7 +2411,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
               <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-linear-to-r from-emerald-400 via-yellow-400 to-red-400 transition-all duration-75 rounded-full"
-                  style={{ width: `${Math.max(10, audioVolume)}%` }}
+                  style={{ width: `${audioVolume}%` }}
                 />
               </div>
               <span className="text-[10px] font-mono text-emerald-200">{audioVolume}%</span>

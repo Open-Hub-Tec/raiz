@@ -1,16 +1,54 @@
 import { afterEach, beforeEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateAudioLevel, observeAudioLevel } from '../useAudioLevelMeter';
+import {
+  calculateAudioLevel,
+  observeAudioLevel,
+  rmsToAudioLevel,
+  smoothAudioLevel,
+} from '../useAudioLevelMeter';
 
-test('RMS level handles silence, empty input, symmetry and clipping within 0–100', () => {
+test('dBFS-derived mapping separates silence, quiet, ordinary and loud amplitudes', () => {
+  assert.equal(rmsToAudioLevel(0), 0);
+  assert.equal(rmsToAudioLevel(0.001), 0);
+  assert.equal(rmsToAudioLevel(0.005), 10);
+  assert.equal(rmsToAudioLevel(0.05), 60);
+  assert.equal(rmsToAudioLevel(0.25), 95);
+  assert.equal(rmsToAudioLevel(0.5), 100);
+});
+
+test('level mapping clamps invalid/extreme amplitudes and is monotonic', () => {
+  assert.equal(rmsToAudioLevel(-1), 0);
+  assert.equal(rmsToAudioLevel(Number.NaN), 0);
+  assert.equal(rmsToAudioLevel(Number.POSITIVE_INFINITY), 100);
+  let previous = 0;
+  for (let step = 0; step <= 1_000; step++) {
+    const level = rmsToAudioLevel(step / 1_000);
+    assert.ok(Number.isInteger(level) && level >= previous && level <= 100);
+    previous = level;
+  }
+});
+
+test('byte-sample RMS handles silence, symmetry and display clamping', () => {
   assert.equal(calculateAudioLevel(new Uint8Array()), 0);
   assert.equal(calculateAudioLevel(new Uint8Array([128, 128])), 0);
-  assert.equal(calculateAudioLevel(new Uint8Array([160, 96])), 50);
+  assert.equal(calculateAudioLevel(new Uint8Array([129, 127])), 20);
+  assert.equal(calculateAudioLevel(new Uint8Array([134, 122])), 59);
+  assert.equal(calculateAudioLevel(new Uint8Array([160, 96])), 95);
   assert.equal(calculateAudioLevel(new Uint8Array([255, 0])), 100);
   for (let sample = 0; sample <= 255; sample++) {
     const level = calculateAudioLevel(new Uint8Array([sample]));
     assert.ok(Number.isInteger(level) && level >= 0 && level <= 100);
   }
+});
+
+test('smoothing attacks faster than it releases', () => {
+  const attacked = smoothAudioLevel(0, 80);
+  const released = smoothAudioLevel(80, 0);
+  assert.equal(attacked, 52);
+  assert.equal(released, 70.4);
+  assert.ok(attacked > 80 - released);
+  assert.ok(smoothAudioLevel(attacked, 80) > attacked);
+  assert.ok(smoothAudioLevel(released, 0) < released);
 });
 
 let frames: Map<number, FrameRequestCallback>;
@@ -26,11 +64,12 @@ function global(name: string, value: unknown) {
 class Context {
   static suspended = false;
   static fail = false;
+  static sample = 160;
   state = Context.suspended ? 'suspended' : 'running';
   closes = 0;
   resumes = 0;
   source = { connect() {}, disconnect: mock.fn() };
-  analyser = { fftSize: 0, disconnect: mock.fn(), getByteTimeDomainData: (data: Uint8Array) => data.fill(160) };
+  analyser = { fftSize: 0, disconnect: mock.fn(), getByteTimeDomainData: (data: Uint8Array) => data.fill(Context.sample) };
   constructor() { context = this; }
   createMediaStreamSource() { return this.source; }
   createAnalyser() { if (Context.fail) throw new Error('unavailable'); return this.analyser; }
@@ -39,7 +78,7 @@ class Context {
 }
 beforeEach(() => {
   frames = new Map(); levels = [];
-  Context.suspended = false; Context.fail = false;
+  Context.suspended = false; Context.fail = false; Context.sample = 160;
   track = Object.assign(new EventTarget(), { readyState: 'live', stop: mock.fn() });
   stream = { getTracks: () => [track], getAudioTracks: () => [track] } as unknown as MediaStream;
   global('window', { AudioContext: Context });
@@ -56,7 +95,7 @@ afterEach(() => {
 });
 test('observer disconnects nodes, cancels RAF, closes once and never stops owned-by-caller tracks', () => {
   const cleanup = observeAudioLevel(stream, (level) => levels.push(level));
-  assert.equal(levels[0], 50);
+  assert.equal(levels[0], 62);
   assert.equal(frames.size, 1);
   cleanup(); cleanup();
   assert.equal(frames.size, 0);
@@ -65,6 +104,14 @@ test('observer disconnects nodes, cancels RAF, closes once and never stops owned
   assert.equal(context.analyser.disconnect.mock.callCount(), 1);
   assert.equal((track.stop as any).mock.callCount(), 0);
   assert.equal(levels.at(-1), 0);
+});
+test('observer applies responsive attack and gradual release between frames', () => {
+  const cleanup = observeAudioLevel(stream, (level) => levels.push(level));
+  const loudFrame = [...frames.values()][0]; frames.clear(); loudFrame(0);
+  Context.sample = 128;
+  const silentFrame = [...frames.values()][0]; frames.clear(); silentFrame(16);
+  assert.deepEqual(levels, [62, 83, 73]);
+  cleanup();
 });
 test('suspended context resumes only once, rejected resume is safe and reports zero', async () => {
   Context.suspended = true;

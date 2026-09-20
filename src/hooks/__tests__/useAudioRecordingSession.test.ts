@@ -112,6 +112,19 @@ test('closing an active modal cancels capture and revokes previous playback URLs
   assert.equal(revoked, 1);
   assert.equal(stopped, 2);
 });
+test('a caller can release a successful playback URL before hook teardown', async () => {
+  await act(async () => root.render(React.createElement(Harness)));
+  let result: any;
+  await act(async () => {
+    const session = await api.startRecording({});
+    result = await session.stop();
+  });
+  assert.equal(revoked, 0);
+  act(() => api.releaseAudioUrl(result.audioUrl));
+  assert.equal(revoked, 1);
+  act(() => api.releaseAudioUrl(result.audioUrl));
+  assert.equal(revoked, 1);
+});
 test('registration shows limit, warns at 75s and saves auto-stop result once at 90s', async () => {
   await act(async () => root.render(React.createElement(RegisterCoffeeLotScreen, { onNavigateScreen: () => {} })));
   const clickRecord = () => (document.querySelector('button[aria-label="Grabar descripción en tu lengua materna"]') as HTMLButtonElement).click();
@@ -154,4 +167,44 @@ test('microphone diagnostic renders the browser bitrate and accepted options wit
   assert.match(document.body.textContent!, /no garantiza el tamaño del archivo/);
   assert.equal(document.querySelector('a[download]')?.getAttribute('href'), 'blob:test-1');
   assert.equal(document.querySelector('a[download]')?.getAttribute('download'), 'raiz-audio.webm');
+});
+
+test('microphone diagnostic automatically stops once at exactly 30 seconds', async () => {
+  await act(async () => root.render(React.createElement(MicrophoneDiagnosticModal, { isOpen: true, onClose: () => {} })));
+  const button = (label: string) => Array.from(document.querySelectorAll('button'))
+    .find((element) => element.textContent?.includes(label)) as HTMLButtonElement;
+  await act(async () => button('Probar').click());
+  assert.match(document.body.textContent!, /0:00 \/ 0:30/);
+  await act(async () => { now = 29_999; mock.timers.tick(29_999); });
+  assert.equal(stopped, 0);
+  await act(async () => { now = 30_000; mock.timers.tick(1); });
+  assert.match(document.body.textContent!, /Tiempo: 30\.000 s/);
+  assert.equal(stopped, 1);
+  assert.equal(created, 1);
+  assert.equal(track.stop.mock.callCount(), 1);
+});
+
+test('microphone diagnostic keeps prior feedback when a restart is still busy', async () => {
+  mock.method(console, 'warn', () => {});
+  const renderModal = (isOpen: boolean) => React.createElement(MicrophoneDiagnosticModal, {
+    isOpen,
+    onClose: () => {},
+  });
+  const button = (label: string) => Array.from(document.querySelectorAll('button'))
+    .find((element) => element.textContent?.includes(label)) as HTMLButtonElement;
+  navigator.mediaDevices.getUserMedia = async () => { throw new Error('fallo previo'); };
+  await act(async () => root.render(renderModal(true)));
+  await act(async () => button('Probar').click());
+  assert.match(document.body.textContent!, /fallo previo/);
+
+  let grant: (stream: MediaStream) => void;
+  navigator.mediaDevices.getUserMedia = () => new Promise((resolve) => grant = resolve);
+  await act(async () => button('Probar').click());
+  await act(async () => button('Probar').click());
+  assert.match(document.body.textContent!, /fallo previo/);
+
+  await act(async () => root.render(renderModal(false)));
+  track.readyState = 'live';
+  grant(stream);
+  await act(async () => {});
 });

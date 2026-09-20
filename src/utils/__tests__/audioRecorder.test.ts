@@ -120,8 +120,32 @@ test('retries rejected audio bitrate with the standard total bitrate before drop
 test('retries native encoder if construction rejects all MIME options', () => {
   Recorder.reject = (options) => !!options?.mimeType;
   assert.equal(createAudioRecorder(stream).mimeType, 'audio/mp4');
-  assert.equal(Recorder.options.length, 4);
-  assert.deepEqual(Recorder.options[3], { audioBitsPerSecond: 24_000 });
+  assert.equal(Recorder.options.length, AUDIO_MIME_TYPES.length * 2 + 1);
+  assert.deepEqual(Recorder.options.at(-1), { audioBitsPerSecond: 24_000 });
+});
+test('tries the next supported Opus MIME with bitrate before dropping the first MIME bitrate', () => {
+  Recorder.supported = [AUDIO_MIME_TYPES[0], AUDIO_MIME_TYPES[1]];
+  Recorder.reject = (options) => options?.mimeType === AUDIO_MIME_TYPES[0];
+  assert.equal(createAudioRecorder(stream).mimeType, AUDIO_MIME_TYPES[1]);
+  assert.deepEqual(Recorder.options, [
+    { mimeType: AUDIO_MIME_TYPES[0], audioBitsPerSecond: 24_000 },
+    { mimeType: AUDIO_MIME_TYPES[0], bitsPerSecond: 24_000 },
+    { mimeType: AUDIO_MIME_TYPES[1], audioBitsPerSecond: 24_000 },
+  ]);
+});
+test('exhausts all supported and native bitrate attempts before MIME-only fallback', () => {
+  Recorder.supported = [AUDIO_MIME_TYPES[0], AUDIO_MIME_TYPES[1]];
+  Recorder.reject = (options) => options?.audioBitsPerSecond !== undefined || options?.bitsPerSecond !== undefined;
+  createAudioRecorder(stream);
+  assert.deepEqual(Recorder.options, [
+    { mimeType: AUDIO_MIME_TYPES[0], audioBitsPerSecond: 24_000 },
+    { mimeType: AUDIO_MIME_TYPES[0], bitsPerSecond: 24_000 },
+    { mimeType: AUDIO_MIME_TYPES[1], audioBitsPerSecond: 24_000 },
+    { mimeType: AUDIO_MIME_TYPES[1], bitsPerSecond: 24_000 },
+    { audioBitsPerSecond: 24_000 },
+    { bitsPerSecond: 24_000 },
+    { mimeType: AUDIO_MIME_TYPES[0] },
+  ]);
 });
 test('missing capability probe uses native encoder without inventing a type', () => {
   const probe = Recorder.isTypeSupported;
@@ -301,8 +325,8 @@ test('transcription deadline returns audio when server stalls', async () => {
 test('browser rejecting every options dictionary can use the no-options constructor', () => {
   Recorder.reject = (options) => options !== undefined;
   assert.equal(createAudioRecorder(stream).mimeType, 'audio/mp4');
-  assert.equal(Recorder.options.length, 6);
-  assert.equal(Recorder.options[5], undefined);
+  assert.equal(Recorder.options.length, AUDIO_MIME_TYPES.length * 3 + 3);
+  assert.equal(Recorder.options.at(-1), undefined);
 });
 
 test('diagnostics distinguish accepted bitrate request from browser-reported and measured rates', async () => {
@@ -328,7 +352,7 @@ test('diagnostics disclose constructor fallback that omitted the bitrate', async
   const session = await startAudioRecording();
   const { diagnostics } = await session.stop();
   assert.deepEqual(diagnostics.constructorOptions, { mimeType: AUDIO_MIME_TYPES[0] });
-  assert.equal(diagnostics.constructorAttempts, 3);
+  assert.equal(diagnostics.constructorAttempts, AUDIO_MIME_TYPES.length * 2 + 3);
   assert.equal(diagnostics.reportedAudioBitsPerSecond, 192_000);
 });
 

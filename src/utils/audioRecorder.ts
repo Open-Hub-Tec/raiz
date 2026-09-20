@@ -106,19 +106,20 @@ export function createAudioRecorder(
   stream: MediaStream,
   onConfigured?: (options: MediaRecorderOptions, attempts: number) => void
 ): MediaRecorder {
-  const mimeType = selectAudioMimeType((type) =>
-    typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported(type)
-  );
-  // For this audio-only stream, total bitrate is another standard way to request
-  // the same target. Try it before silently accepting the encoder's default.
+  const supportedMimeTypes = typeof MediaRecorder.isTypeSupported === 'function'
+    ? AUDIO_MIME_TYPES.filter((type) => MediaRecorder.isTypeSupported(type))
+    : [];
+  // Give every advertised format both standard bitrate-preserving attempts before
+  // accepting any bitrate-free construction. For this audio-only stream, total
+  // bitrate is a reasonable fallback when audioBitsPerSecond is rejected.
   const candidates: (MediaRecorderOptions | undefined)[] = [
-    ...(mimeType ? [
+    ...supportedMimeTypes.flatMap((mimeType) => [
       { mimeType, audioBitsPerSecond: AUDIO_BITS_PER_SECOND },
       { mimeType, bitsPerSecond: AUDIO_BITS_PER_SECOND },
-      { mimeType },
-    ] : []),
+    ]),
     { audioBitsPerSecond: AUDIO_BITS_PER_SECOND },
     { bitsPerSecond: AUDIO_BITS_PER_SECOND },
+    ...supportedMimeTypes.map((mimeType) => ({ mimeType })),
     undefined,
   ];
   let lastError: unknown;
