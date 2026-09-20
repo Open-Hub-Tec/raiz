@@ -146,3 +146,31 @@ export interface PendingOfflineLot {
   recordedAt: number;
   syncStatus: 'pending' | 'syncing' | 'synced';
 }
+
+/** Durable state kept by the offline outbox. Binary media is stored separately. */
+export type OfflineLotStatus = 'PENDING' | 'UPLOADING' | 'SEALED' | 'FAILED';
+
+export interface OfflineLotMetadata {
+  tempId: string;
+  producerName: string;
+  community: string;
+  cropType: PendingOfflineLot['cropType'];
+  variety: string;
+  weightKgOrUnits: number;
+  priceExpectedMxn: number;
+  recordedAt: number;
+  status: OfflineLotStatus;
+  retryCount: number;
+  nextAttemptAt: number | null;
+  lastError?: string;
+  photoMediaId?: string;
+  audioMediaId?: string;
+}
+
+export interface OfflineMediaBlob {
+  id: string;
+  lotId: string;
+  kind: 'photo' | 'audio';
+  blob: Blob;
+  mimeType: string;
+}
