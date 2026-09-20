@@ -6,7 +6,14 @@
  */
 
 import { PendingOfflineLot } from '../../types';
-import { openRaizDB, saveOfflineLot, getPendingOfflineLots, removeOfflineLot } from '../../utils/offlineStorage';
+import {
+  getOfflineLotMetadata,
+  getPendingOfflineLots,
+  openRaizDB,
+  removeOfflineLot,
+  saveOfflineLot,
+  updateOfflineLotStatus,
+} from '../../utils/offlineStorage';
 import { CryptoEngine } from '../crypto/CryptoEngine';
 
 export interface SyncResult {
@@ -75,7 +82,10 @@ export class SyncEngine {
     let failedCount = 0;
 
     for (const lot of pending) {
+      const metadata = await getOfflineLotMetadata(lot.tempId);
+      if (metadata?.nextAttemptAt && metadata.nextAttemptAt > Date.now()) continue;
       try {
+        await updateOfflineLotStatus(lot.tempId, 'UPLOADING');
         // 1. Validar integridad criptográfica del lote
         const digest = await CryptoEngine.generateCommunityDigest({
           producerName: lot.producerName,
@@ -90,11 +100,17 @@ export class SyncEngine {
         // Simulación de latencia de red segura (300ms)
         await new Promise(r => setTimeout(r, 300));
 
-        // 3. Remover de la cola local una vez confirmado
+        // 3. Mark sealed before removing the local outbox record.
+        await updateOfflineLotStatus(lot.tempId, 'SEALED');
         await removeOfflineLot(lot.tempId);
         syncedIds.push(lot.tempId);
       } catch (err) {
         console.error(`SyncEngine: Error al sincronizar lote ${lot.tempId}:`, err);
+        try {
+          await updateOfflineLotStatus(lot.tempId, 'FAILED', err instanceof Error ? err.message : String(err));
+        } catch (statusError) {
+          console.error(`SyncEngine: No se pudo persistir el reintento de ${lot.tempId}:`, statusError);
+        }
         failedCount++;
       }
     }
@@ -120,5 +136,6 @@ export class SyncEngine {
       console.log('SyncEngine: Conexión recuperada. Procesando cola de cosechas pendientes...');
       this.processQueue();
     });
+    if (navigator.onLine) void this.processQueue();
   }
 }
