@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, test, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { CueContext } from './recordingCueFixture';
 import { AUDIO_BITS_PER_SECOND, AUDIO_MIME_TYPES, MAX_RECORDING_SECONDS, createAudioRecorder, selectAudioMimeType, startAudioRecording } from '../audioRecorder';
 
 class Track extends EventTarget {
@@ -384,4 +385,176 @@ test('diagnostics handle unavailable browser bitrate and capture settings honest
   assert.equal(diagnostics.reportedAudioBitsPerSecond, null);
   assert.equal(diagnostics.channelCount, null);
   assert.equal(diagnostics.sampleRate, null);
+});
+
+// Fake speaker output verifies timing and resource ownership, not device audibility.
+function enableCues() {
+  CueContext.instances = [];
+  (window as any).AudioContext = CueContext;
+}
+
+test('cue context resumes before permission; warning once at 75s and distinct final at 90s', async () => {
+  enableCues();
+  navigator.mediaDevices.getUserMedia = async () => {
+    assert.equal(CueContext.instances.length, 1);
+    assert.equal(CueContext.instances[0].resume.mock.callCount(), 1);
+    return stream;
+  };
+  const session = await startAudioRecording({ audibleLimitCues: true });
+  const context = CueContext.instances[0];
+  mock.timers.tick(74_999);
+  assert.equal(context.oscillators.length, 0);
+  mock.timers.tick(1);
+  assert.equal(context.oscillators.length, 1);
+  const warning = context.oscillators[0];
+  warning.onended();
+  assert.equal(warning.disconnect.mock.callCount(), 1);
+  mock.timers.tick(14_999);
+  assert.equal(context.oscillators.length, 1);
+  mock.timers.tick(1);
+  await session.result;
+  assert.equal(Recorder.instance.stops, 1);
+  assert.equal(context.oscillators.length, 2);
+  assert.notEqual(context.oscillators[1].frequency.value, warning.frequency.value);
+  mock.timers.tick(400);
+  assert.equal(context.close.mock.callCount(), 1);
+  assert.ok(context.oscillators.every((node) => node.disconnect.mock.callCount() === 1));
+  assert.ok(context.gains.every((node) => node.disconnect.mock.callCount() === 1));
+  mock.timers.tick(180_000);
+  assert.equal(context.oscillators.length, 2);
+  assert.equal(CueContext.instances.length, 1);
+});
+
+for (const reason of ['manual', 'cancel', 'hidden', 'ended', 'native', 'error']) {
+  for (const at of [0, 75_000]) {
+    test(`${reason} at ${at}ms prevents subsequent cues and closes audio resources`, async () => {
+      enableCues();
+      const session = await startAudioRecording({ audibleLimitCues: true });
+      const context = CueContext.instances[0];
+      mock.timers.tick(at);
+      const before = context.oscillators.length;
+      if (reason === 'manual') void session.stop();
+      if (reason === 'cancel') session.cancel();
+      if (reason === 'hidden') {
+        documentMock.hidden = true; documentMock.dispatchEvent(new Event('visibilitychange'));
+      }
+      if (reason === 'ended') { track.readyState = 'ended'; track.dispatchEvent(new Event('ended')); }
+      if (reason === 'native') { Recorder.instance.state = 'inactive'; Recorder.instance.flush(); }
+      if (reason === 'error') Recorder.instance.onerror();
+      if (reason === 'cancel' || reason === 'error') await assert.rejects(session.result);
+      else await session.result;
+      mock.timers.tick(180_000);
+      assert.equal(context.oscillators.length, before);
+      assert.equal(context.close.mock.callCount(), 1);
+      assert.ok(context.oscillators.every((node) => node.disconnect.mock.callCount() === 1));
+    });
+  }
+}
+
+for (const failure of ['permission', 'constructor', 'start', 'stop']) {
+  test(`cue resources are released on ${failure} failure`, async () => {
+    enableCues();
+    if (failure === 'permission') navigator.mediaDevices.getUserMedia = async () => { throw new Error('denied'); };
+    if (failure === 'constructor') Recorder.reject = () => true;
+    if (failure === 'start') Recorder.startError = true;
+    if (failure === 'stop') {
+      Recorder.stopError = true;
+      const session = await startAudioRecording({ audibleLimitCues: true });
+      mock.timers.tick(90_000);
+      await assert.rejects(session.result);
+    } else await assert.rejects(startAudioRecording({ audibleLimitCues: true }));
+    const context = CueContext.instances[0];
+    const before = context.oscillators.length;
+    mock.timers.tick(180_000);
+    assert.equal(context.oscillators.length, before);
+    assert.equal(context.close.mock.callCount(), 1);
+  });
+}
+
+test('default recorder callers never create a speaker context', async () => {
+  enableCues();
+  const session = await startAudioRecording();
+  mock.timers.tick(90_000);
+  await session.result;
+  assert.equal(CueContext.instances.length, 0);
+});
+
+test('aborting while permission is pending immediately closes the cue context', async () => {
+  enableCues();
+  let grant: (stream: MediaStream) => void;
+  navigator.mediaDevices.getUserMedia = () => new Promise((resolve) => grant = resolve);
+  const owner = new AbortController();
+  const pending = startAudioRecording({ audibleLimitCues: true, signal: owner.signal });
+  owner.abort();
+  assert.equal(CueContext.instances[0].close.mock.callCount(), 1);
+  grant(stream);
+  await assert.rejects(pending, { name: 'AbortError' });
+});
+
+for (const unavailable of ['missing', 'constructor', 'suspended', 'rejected', 'playback']) {
+  test(`${unavailable} Web Audio does not interfere with recording or auto-stop`, async () => {
+    enableCues();
+    if (unavailable === 'missing') delete (window as any).AudioContext;
+    if (unavailable === 'constructor') (window as any).AudioContext = class { constructor() { throw new Error('unavailable'); } };
+    if (unavailable === 'suspended' || unavailable === 'rejected') {
+      (window as any).AudioContext = class extends CueContext {
+        resume = mock.fn(async () => { if (unavailable === 'rejected') throw new Error('blocked'); });
+      };
+    }
+    const session = await startAudioRecording({ audibleLimitCues: true });
+    if (unavailable === 'playback') CueContext.instances[0].createGain = () => { throw new Error('failed'); };
+    mock.timers.tick(75_000);
+    mock.timers.tick(15_000);
+    assert.ok((await session.result).audioBlob.size > 0);
+    assert.equal(Recorder.instance.stops, 1);
+    mock.timers.tick(400);
+    assert.ok(CueContext.instances.every((context) => context.close.mock.callCount() === 1));
+  });
+}
+
+for (const reason of ['hidden', 'ended', 'native']) {
+  test(`deadline does not mislabel queued ${reason} termination as a limit cue`, async () => {
+    enableCues();
+    const reasons: string[] = [];
+    const session = await startAudioRecording({ audibleLimitCues: true, onStopped: (reason) => reasons.push(reason) });
+    if (reason === 'hidden') documentMock.hidden = true;
+    if (reason === 'ended') track.readyState = 'ended';
+    if (reason === 'native') Recorder.instance.state = 'inactive';
+    mock.timers.tick(90_000);
+    if (reason === 'native') Recorder.instance.flush();
+    await session.result;
+    assert.deepEqual(reasons, [reason === 'hidden' ? 'hidden' : 'ended']);
+    assert.equal(CueContext.instances[0].oscillators.length, 0);
+    assert.equal(CueContext.instances[0].close.mock.callCount(), 1);
+  });
+}
+
+test('late warning timer is skipped when the recording deadline has already elapsed', async () => {
+  enableCues();
+  let now = 0;
+  mock.method(performance, 'now', () => now);
+  const session = await startAudioRecording({ audibleLimitCues: true });
+  now = 90_100;
+  mock.timers.tick(75_000);
+  assert.equal(CueContext.instances[0].oscillators.length, 0);
+  mock.timers.tick(15_000);
+  await session.result;
+  assert.equal(CueContext.instances[0].oscillators.length, 1);
+  session.cancel();
+});
+
+test('pending audio resume cannot play a queued cue after cancellation', async () => {
+  enableCues();
+  let resume: () => void;
+  (window as any).AudioContext = class extends CueContext {
+    resume = mock.fn(() => new Promise<void>((resolve) => { resume = resolve; }));
+  };
+  const session = await startAudioRecording({ audibleLimitCues: true });
+  mock.timers.tick(75_000);
+  session.cancel();
+  resume();
+  await assert.rejects(session.result, { name: 'AbortError' });
+  mock.timers.tick(90_000);
+  assert.equal(CueContext.instances[0].oscillators.length, 0);
+  assert.equal(CueContext.instances[0].close.mock.callCount(), 1);
 });

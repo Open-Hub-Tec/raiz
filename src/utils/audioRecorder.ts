@@ -1,3 +1,5 @@
+import { createRecordingLimitCues } from './recordingLimitCues';
+
 // Audio Recording and Speech-to-Text Utility for Raíz
 // Supports MediaRecorder, Web Speech API (webkitSpeechRecognition) and Gemini backend transcription
 
@@ -22,6 +24,7 @@ export interface AudioRecordingDiagnostics {
 }
 
 export interface StartRecordingOptions {
+  audibleLimitCues?: boolean;
   onStopped?: (reason: RecordingStopReason) => void;
   signal?: AbortSignal;
   onInterimTranscript?: (text: string) => void;
@@ -90,6 +93,7 @@ export function blobToBase64(blob: Blob): Promise<string> {
 // This is a bitrate request, not a guarantee about a device's encoder output.
 export const AUDIO_BITS_PER_SECOND = 24_000;
 export const MAX_RECORDING_SECONDS = 90;
+export const RECORDING_WARNING_SECONDS = 75;
 export const AUDIO_MIME_TYPES = [
   'audio/webm;codecs=opus',
   'audio/ogg;codecs=opus',
@@ -150,13 +154,20 @@ export async function startAudioRecording(
   if (typeof MediaRecorder === 'undefined') {
     throw new Error('Tu navegador no permite grabar audio.');
   }
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      // A voice note does not need stereo. Ideal allows devices to fall back.
-      channelCount: { ideal: 1 },
-      echoCancellation: true, noiseSuppression: true, autoGainControl: true,
-    },
-  });
+  const cues = options.audibleLimitCues ? createRecordingLimitCues(signal) : undefined;
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        // A voice note does not need stereo. Ideal allows devices to fall back.
+        channelCount: { ideal: 1 },
+        echoCancellation: true, noiseSuppression: true, autoGainControl: true,
+      },
+    });
+  } catch (error) {
+    cues?.dispose();
+    throw error;
+  }
   const stopTracks = () => stream.getTracks().forEach((track) => track.stop());
   let mediaRecorder: MediaRecorder;
   let constructorOptions: MediaRecorderOptions = {};
@@ -171,6 +182,7 @@ export async function startAudioRecording(
     });
   } catch (error) {
     stopTracks();
+    cues?.dispose();
     throw error;
   }
 
@@ -178,6 +190,7 @@ export async function startAudioRecording(
   let speechTranscript = '';
   let phase: 'recording' | 'stopping' | 'finished' | 'cancelled' = 'recording';
   let timer: ReturnType<typeof setTimeout>;
+  let warningTimer: ReturnType<typeof setTimeout>;
   let stoppedAt = 0;
   let startTime = 0;
   let cleaned = false;
@@ -200,6 +213,7 @@ export async function startAudioRecording(
     if (cleaned) return;
     cleaned = true;
     clearTimeout(timer);
+    clearTimeout(warningTimer);
     if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility);
     stream.getTracks().forEach((track) => track.removeEventListener('ended', onEnded));
     try { recognition?.stop(); } catch {}
@@ -213,6 +227,8 @@ export async function startAudioRecording(
   const notify = (reason: RecordingStopReason) => {
     if (notified) return;
     notified = true;
+    if (reason === 'limit') cues?.limit();
+    else cues?.dispose();
     try { onStopped?.(reason); } catch (error) { console.warn('Recording callback failed:', error); }
   };
   const detach = () => {
@@ -226,6 +242,7 @@ export async function startAudioRecording(
     if (phase === 'finished' || phase === 'cancelled') return;
     cancelled = true;
     phase = 'cancelled';
+    cues?.dispose();
     cleanup();
     transcriptionController.abort();
     try { stopEncoder(); } catch {}
@@ -298,6 +315,7 @@ export async function startAudioRecording(
     return result;
   };
   function cancel() {
+    cues?.dispose();
     if (phase === 'finished' || phase === 'cancelled') return;
     cancelled = true;
     phase = 'cancelled';
@@ -350,7 +368,18 @@ export async function startAudioRecording(
     // timeslices. Avoid forcing frequent encoder flushes/container clusters.
     mediaRecorder.start();
     startTime = performance.now();
-    timer = setTimeout(() => { void stop('limit'); }, MAX_RECORDING_SECONDS * 1000);
+    timer = setTimeout(() => {
+      const reason = typeof document !== 'undefined' && document.hidden ? 'hidden'
+        : mediaRecorder.state !== 'recording' ||
+          !stream.getAudioTracks().some((track) => track.readyState === 'live') ? 'ended' : 'limit';
+      void stop(reason);
+    }, MAX_RECORDING_SECONDS * 1000);
+    if (cues) warningTimer = setTimeout(() => {
+      if (phase === 'recording' && mediaRecorder.state === 'recording' &&
+          !signal?.aborted && !(typeof document !== 'undefined' && document.hidden) &&
+          stream.getAudioTracks().some((track) => track.readyState === 'live') &&
+          performance.now() - startTime < MAX_RECORDING_SECONDS * 1000) cues.warning();
+    }, RECORDING_WARNING_SECONDS * 1000);
     signal?.addEventListener('abort', cancel, { once: true });
     stream.getTracks().forEach((track) => track.addEventListener('ended', onEnded));
     if (typeof document !== 'undefined') {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAudioRecordingSession } from '../hooks/useAudioRecordingSession';
 import { AppLanguage, ScreenView, PendingOfflineLot } from '../types';
-import { LiveRecorderSession, MAX_RECORDING_SECONDS } from '../utils/audioRecorder';
+import { LiveRecorderSession, MAX_RECORDING_SECONDS, RECORDING_WARNING_SECONDS } from '../utils/audioRecorder';
 import { getProductProfile, ProductProfile, sanitizeProductName } from '../utils/productUtils';
 import { saveOfflineLot } from '../utils/offlineStorage';
 
@@ -192,6 +192,7 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
         // START recording
         try {
           const session = await startRecording({
+            audibleLimitCues: true,
             onStopped: (reason) => {
               if (reason === 'limit') setAutoStopMessage('Grabación detenida automáticamente: límite de 90 segundos.');
               if (reason === 'hidden') setAutoStopMessage('Grabación detenida al salir de la pantalla.');
@@ -1370,8 +1371,8 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
               </div>
             </div>
 
-            <p role="status" className={`text-xs px-2 ${recordSeconds >= 75 && isRecording ? 'text-red-700 font-bold' : 'text-[#424843]'}`}>
-              {autoStopMessage || (isRecording && recordSeconds >= 75
+            <p role="status" className={`text-xs px-2 ${recordSeconds >= RECORDING_WARNING_SECONDS && isRecording ? 'text-red-700 font-bold' : 'text-[#424843]'}`}>
+              {autoStopMessage || (isRecording && recordSeconds >= RECORDING_WARNING_SECONDS
                 ? `Quedan ${MAX_RECORDING_SECONDS - recordSeconds} segundos. Se detendrá automáticamente.`
                 : 'Máximo 90 segundos. La grabación se detiene automáticamente o al salir de la pantalla.')}
               {voiceBusy && ' Procesando audio…'}

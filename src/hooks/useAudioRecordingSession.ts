@@ -6,6 +6,7 @@ import { useAudioLevelMeter } from './useAudioLevelMeter';
 export function useAudioRecordingSession(active = true) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const controller = useRef<AbortController | null>(null);
+  const lastSession = useRef<LiveRecorderSession | null>(null);
   const urls = useRef(new Set<string>());
   const mounted = useRef(false);
   const audioLevel = useAudioLevelMeter(stream);
@@ -20,6 +21,8 @@ export function useAudioRecordingSession(active = true) {
     return () => {
       mounted.current = false;
       controller.current?.abort();
+      lastSession.current?.cancel();
+      lastSession.current = null;
       controller.current = null;
       urls.current.forEach((url) => URL.revokeObjectURL(url));
       urls.current.clear();
@@ -28,6 +31,9 @@ export function useAudioRecordingSession(active = true) {
 
   const startRecording = async (options: StartRecordingOptions): Promise<LiveRecorderSession> => {
     if (!mounted.current || controller.current) throw new DOMException('Grabación ocupada.', 'AbortError');
+    // A completed note may still be playing its brief final cue.
+    lastSession.current?.cancel();
+    lastSession.current = null;
     const owner = new AbortController();
     controller.current = owner;
     try {
@@ -45,6 +51,7 @@ export function useAudioRecordingSession(active = true) {
         session.cancel();
         throw new DOMException('Grabación cancelada.', 'AbortError');
       }
+      lastSession.current = session;
       // Release busy state only after encoding/transcription finishes; allow cancel during it.
       void session.result.then((result) => {
         if (owner.signal.aborted || !mounted.current) URL.revokeObjectURL(result.audioUrl);

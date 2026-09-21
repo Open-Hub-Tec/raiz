@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import React, { act, StrictMode } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
+import { CueContext } from '../../utils/__tests__/recordingCueFixture';
 import { useAudioRecordingSession } from '../useAudioRecordingSession';
 import { RegisterCoffeeLotScreen } from '../../components/RegisterCoffeeLotScreen';
 import { MicrophoneDiagnosticModal } from '../../components/MicrophoneDiagnosticModal';
@@ -126,6 +127,8 @@ test('a caller can release a successful playback URL before hook teardown', asyn
   assert.equal(revoked, 1);
 });
 test('registration shows limit, warns at 75s and saves auto-stop result once at 90s', async () => {
+  CueContext.instances = [];
+  (window as any).AudioContext = CueContext;
   await act(async () => root.render(React.createElement(RegisterCoffeeLotScreen, { onNavigateScreen: () => {} })));
   const clickRecord = () => (document.querySelector('button[aria-label="Grabar descripción en tu lengua materna"]') as HTMLButtonElement).click();
   await act(async () => { clickRecord(); clickRecord(); });
@@ -133,13 +136,18 @@ test('registration shows limit, warns at 75s and saves auto-stop result once at 
   assert.match(document.body.textContent!, /0:00 \/ 1:30/);
   await act(async () => { now = 75_000; mock.timers.tick(75_000); });
   assert.match(document.body.textContent!, /Quedan 15 segundos/);
+  assert.equal(CueContext.instances[0].oscillators.length, 1);
   await act(async () => { now = 90_000; mock.timers.tick(15_000); });
   assert.match(document.body.textContent!, /Grabación detenida automáticamente: límite de 90 segundos/);
   assert.match(document.body.textContent!, /Nota de voz grabada \(1:30\)/);
+  assert.equal(CueContext.instances[0].oscillators.length, 2);
+  assert.equal(CueContext.instances[0].close.mock.callCount(), 0);
   assert.equal(document.querySelector('button[aria-label="Detener grabación de voz"]'), null);
   assert.equal(created, 1);
   assert.equal(stopped, 1);
   assert.equal(track.stop.mock.callCount(), 1);
+  await act(async () => root.unmount());
+  assert.equal(CueContext.instances[0].close.mock.callCount(), 1);
 });
 test('registration manual double Stop before deadline produces a single saved note', async () => {
   await act(async () => root.render(React.createElement(RegisterCoffeeLotScreen, { onNavigateScreen: () => {} })));
