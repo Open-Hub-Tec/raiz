@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AppLanguage, ScreenView, PendingOfflineLot } from '../types';
-import { startAudioRecording, LiveRecorderSession } from '../utils/audioRecorder';
+import {
+  startAudioRecording,
+  LiveRecorderSession,
+  MAX_RECORDING_SECONDS,
+} from '../utils/audioRecorder';
+import { useAudioLevelMeter } from '../hooks/useAudioLevelMeter';
 import { getProductProfile, ProductProfile, sanitizeProductName } from '../utils/productUtils';
 import { saveOfflineLot } from '../utils/offlineStorage';
 
@@ -57,8 +62,12 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
 
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordSeconds, setRecordSeconds] = useState<number>(0);
-  const [audioVolume, setAudioVolume] = useState<number>(0);
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
+  const [voiceSecondsRemaining, setVoiceSecondsRemaining] = useState<number | null>(null);
   const [liveVoiceTranscript, setLiveVoiceTranscript] = useState<string>('');
+
+  // Reusable real-time decibel meter driven by the recorder's microphone stream
+  const { volume: audioVolume, decibels: audioDecibels } = useAudioLevelMeter(audioStream);
   const [recordedAudioNote, setRecordedAudioNote] = useState<{
     audioUrl: string;
     transcript: string;
@@ -151,23 +160,48 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
     };
   }, []);
 
+  // Best-effort Web Audio cue for the auto-stop warning and final stop
+  const playCueTone = (frequency: number, durationMs = 180) => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const endAt = ctx.currentTime + durationMs / 1000;
+      oscillator.type = 'sine';
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, endAt);
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.start();
+      oscillator.stop(endAt);
+      oscillator.onended = () => ctx.close().catch(() => {});
+    } catch {
+      // Auditory cues are best-effort; the visual timer always remains available
+    }
+  };
+
+  const buildVoiceTranscript = (resultTranscript: string) =>
+    resultTranscript ||
+    liveVoiceTranscript ||
+    `Lote registrado de ${selectedProductType} con verificación de campo en la Mixteca.`;
+
   const toggleVoiceNoteRecording = async () => {
     if (isRecording) {
       // STOP recording
       setIsRecording(false);
-      setAudioVolume(0);
       if (audioSessionRef.current) {
         try {
           const result = await audioSessionRef.current.stop();
           audioSessionRef.current = null;
-          const transcript =
-            result.transcript ||
-            liveVoiceTranscript ||
-            `Lote registrado de ${selectedProductType} con verificación de campo en la Mixteca.`;
-
+          setAudioStream(null);
+          setVoiceSecondsRemaining(null);
           setRecordedAudioNote({
             audioUrl: result.audioUrl,
-            transcript,
+            transcript: buildVoiceTranscript(result.transcript),
             duration: formatTimer(result.durationSeconds || recordSeconds),
           });
 
@@ -182,13 +216,36 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
       // START recording
       setLiveVoiceTranscript('');
       setVoiceToast(null);
+      setVoiceSecondsRemaining(null);
       try {
         const session = await startAudioRecording({
-          onVolumeChange: (vol) => setAudioVolume(vol),
           onInterimTranscript: (text) => setLiveVoiceTranscript(text),
+          onTimeWarning: (secondsRemaining) => {
+            setVoiceSecondsRemaining(secondsRemaining);
+            if (secondsRemaining > 0) {
+              playCueTone(880, 150);
+            }
+          },
+          onAutoStop: (result) => {
+            audioSessionRef.current = null;
+            setAudioStream(null);
+            setIsRecording(false);
+            setVoiceSecondsRemaining(null);
+            playCueTone(440, 420);
+            setRecordedAudioNote({
+              audioUrl: result.audioUrl,
+              transcript: buildVoiceTranscript(result.transcript),
+              duration: formatTimer(result.durationSeconds || MAX_RECORDING_SECONDS),
+            });
+            setVoiceToast(
+              `⏱️ Límite de ${MAX_RECORDING_SECONDS} s alcanzado. La nota de voz se guardó automáticamente.`
+            );
+            setTimeout(() => setVoiceToast(null), 6000);
+          },
           lang: 'es-MX',
         });
         audioSessionRef.current = session;
+        setAudioStream(session.stream);
         setIsRecording(true);
       } catch (err: any) {
         console.warn('Mic permission error:', err);
@@ -1334,7 +1391,9 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
                 </div>
                 <div className="flex flex-col items-end shrink-0">
                   <span className={`text-[13px] font-mono font-black ${isRecording ? 'text-red-700 animate-pulse' : 'text-[#a73918]'}`}>
-                    {formatTimer(recordSeconds)}
+                    {isRecording && voiceSecondsRemaining !== null
+                      ? `-${formatTimer(voiceSecondsRemaining)}`
+                      : formatTimer(recordSeconds)}
                   </span>
                   <span className="text-[10px] text-[#727973] uppercase font-bold">
                     {isRecording ? 'REC' : 'VOZ'}
@@ -1355,7 +1414,19 @@ export const RegisterCoffeeLotScreen: React.FC<RegisterCoffeeLotScreenProps> = (
                     style={{ width: `${Math.max(8, audioVolume)}%` }}
                   />
                 </div>
-                <span className="text-[10px] font-mono text-[#424843]">{audioVolume}%</span>
+                <span className="text-[10px] font-mono text-[#424843]">{audioVolume}% · {audioDecibels} dB</span>
+              </div>
+            )}
+
+            {/* Visual cue for the 90-second auto-stop limit */}
+            {isRecording && voiceSecondsRemaining !== null && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-100 border border-amber-400 text-amber-950 text-[11px] font-bold animate-pulse">
+                <span className="material-symbols-outlined text-[16px]">timer</span>
+                <span>
+                  {voiceSecondsRemaining > 0
+                    ? `Se detendrá automáticamente en ${voiceSecondsRemaining} s (límite ${MAX_RECORDING_SECONDS} s)`
+                    : `Límite de ${MAX_RECORDING_SECONDS} s alcanzado`}
+                </span>
               </div>
             )}
 

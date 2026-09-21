@@ -1,6 +1,18 @@
 // Audio Recording and Speech-to-Text Utility for Raíz
 // Supports MediaRecorder, Web Speech API (webkitSpeechRecognition) and Gemini backend transcription
 
+/**
+ * Voice notes are capped at 90 seconds to keep payloads small enough for
+ * 2G/EDGE sync in rural municipalities.
+ */
+export const MAX_RECORDING_SECONDS = 90;
+
+/** Seconds remaining when the recorder emits its final time warning cue. */
+export const AUTO_STOP_WARNING_SECONDS = 10;
+
+/** Target bitrate for speech: 24 kbps Opus keeps 30 s well under 150 KB. */
+export const TARGET_AUDIO_BITRATE = 24000;
+
 export interface AudioRecordingResult {
   audioBlob: Blob;
   audioUrl: string;
@@ -9,15 +21,121 @@ export interface AudioRecordingResult {
   durationSeconds: number;
 }
 
+export interface AudioLevelReading {
+  /** Perceptually scaled microphone level from 0 to 100. */
+  volume: number;
+  /** Approximate dBFS of the input signal, from -60 to 0. */
+  decibels: number;
+}
+
 export interface StartRecordingOptions {
   onVolumeChange?: (volume: number) => void;
   onInterimTranscript?: (text: string) => void;
+  /** Fired once when the recorder approaches the auto-stop limit. */
+  onTimeWarning?: (secondsRemaining: number) => void;
+  /** Fired when the recorder stopped itself after reaching the limit. */
+  onAutoStop?: (result: AudioRecordingResult) => void;
+  /** Hard cap for a single recording. Defaults to MAX_RECORDING_SECONDS. */
+  maxDurationSeconds?: number;
   lang?: string;
 }
 
 export interface LiveRecorderSession {
+  /** Underlying microphone stream, exposed for consumers of useAudioLevelMeter. */
+  stream: MediaStream;
   stop: () => Promise<AudioRecordingResult>;
   cancel: () => void;
+}
+
+export interface AudioLevelMonitor {
+  stop: () => void;
+}
+
+/**
+ * Convert an average frequency-bin magnitude into a 0-100 perceptual level.
+ */
+export function computeVolumeLevel(frequencyData: Uint8Array): number {
+  let sum = 0;
+  for (let i = 0; i < frequencyData.length; i++) {
+    sum += frequencyData[i];
+  }
+  const average = frequencyData.length ? sum / frequencyData.length : 0;
+  return Math.min(100, Math.round((average / 60) * 100));
+}
+
+/**
+ * Approximate dBFS from a time-domain waveform (128 = silence).
+ */
+export function computeDecibels(timeDomainData: Uint8Array): number {
+  let sumSquares = 0;
+  for (let i = 0; i < timeDomainData.length; i++) {
+    const normalized = (timeDomainData[i] - 128) / 128;
+    sumSquares += normalized * normalized;
+  }
+  const rms = Math.sqrt(sumSquares / timeDomainData.length);
+  if (rms <= 0) return -60;
+  return Math.max(-60, Math.min(0, Math.round(20 * Math.log10(rms))));
+}
+
+/**
+ * Framework-agnostic microphone level meter. Creates an AudioContext analyser
+ * bound to the given stream and reports volume + dBFS on every animation frame.
+ */
+export function createAudioLevelMonitor(
+  stream: MediaStream,
+  onLevel: (reading: AudioLevelReading) => void
+): AudioLevelMonitor {
+  let audioContext: AudioContext | null = null;
+  let animFrameId: number | null = null;
+
+  const stop = () => {
+    if (animFrameId !== null) {
+      cancelAnimationFrame(animFrameId);
+      animFrameId = null;
+    }
+    if (audioContext && audioContext.state !== 'closed') {
+      audioContext.close().catch(() => {});
+    }
+  };
+
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return { stop };
+
+    audioContext = new AudioCtx();
+    if (audioContext.state === 'suspended') {
+      audioContext.resume().catch(() => {});
+    }
+
+    const sourceNode = audioContext.createMediaStreamSource(stream);
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.4;
+    sourceNode.connect(analyser);
+
+    const frequencyData = new Uint8Array(analyser.frequencyBinCount);
+    const timeDomainData = new Uint8Array(analyser.fftSize);
+
+    const checkVolume = () => {
+      if (!audioContext) return;
+      if (audioContext.state === 'suspended') {
+        audioContext.resume().catch(() => {});
+      }
+      analyser.getByteFrequencyData(frequencyData);
+      analyser.getByteTimeDomainData(timeDomainData);
+      onLevel({
+        volume: computeVolumeLevel(frequencyData),
+        decibels: computeDecibels(timeDomainData),
+      });
+      animFrameId = requestAnimationFrame(checkVolume);
+    };
+
+    checkVolume();
+  } catch (err) {
+    console.warn('AudioContext no disponible para medidor de volumen:', err);
+  }
+
+  return { stop };
 }
 
 /**
@@ -75,7 +193,14 @@ export function blobToBase64(blob: Blob): Promise<string> {
 export async function startAudioRecording(
   options: StartRecordingOptions = {}
 ): Promise<LiveRecorderSession> {
-  const { onVolumeChange, onInterimTranscript, lang = 'es-MX' } = options;
+  const {
+    onVolumeChange,
+    onInterimTranscript,
+    onTimeWarning,
+    onAutoStop,
+    maxDurationSeconds = MAX_RECORDING_SECONDS,
+    lang = 'es-MX',
+  } = options;
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     throw new Error('Tu navegador no permite acceso al micrófono o la conexión no es segura (HTTPS).');
@@ -93,14 +218,15 @@ export async function startAudioRecording(
   const startTime = Date.now();
   const audioChunks: Blob[] = [];
 
-  // Determine supported mime type across Chrome, Firefox, Safari iOS
+  // Determine supported mime type across Chrome, Firefox, Safari iOS.
+  // Opus containers are prioritized for the 24 kbps voice target.
   let selectedMimeType = '';
   const candidates = [
     'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/mp4',
     'audio/ogg;codecs=opus',
+    'audio/webm',
     'audio/ogg',
+    'audio/mp4',
     'audio/wav',
   ];
 
@@ -113,7 +239,10 @@ export async function startAudioRecording(
     }
   }
 
-  const recorderOptions: MediaRecorderOptions = selectedMimeType ? { mimeType: selectedMimeType } : {};
+  const recorderOptions: MediaRecorderOptions = {
+    ...(selectedMimeType ? { mimeType: selectedMimeType } : {}),
+    audioBitsPerSecond: TARGET_AUDIO_BITRATE,
+  };
   const mediaRecorder = new MediaRecorder(stream, recorderOptions);
   const actualMimeType = mediaRecorder.mimeType || selectedMimeType || 'audio/webm';
 
@@ -123,48 +252,32 @@ export async function startAudioRecording(
     }
   };
 
-  // 2. AudioContext volume visualizer
-  let audioContext: AudioContext | null = null;
-  let animFrameId: number | null = null;
+  let finalized = false;
+  let autoStopped = false;
+  let resolveFinal: ((result: AudioRecordingResult) => void) | null = null;
+  const finalResult = new Promise<AudioRecordingResult>((resolve) => {
+    resolveFinal = resolve;
+  });
 
-  try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (AudioCtx) {
-      audioContext = new AudioCtx();
-      if (audioContext.state === 'suspended') {
-        audioContext.resume().catch(() => {});
-      }
-      const sourceNode = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.4;
-      sourceNode.connect(analyser);
+  let autoStopTimer: ReturnType<typeof setTimeout> | null = null;
+  let warningTimer: ReturnType<typeof setTimeout> | null = null;
 
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-      const checkVolume = () => {
-        if (audioContext && audioContext.state === 'suspended') {
-          audioContext.resume().catch(() => {});
-        }
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
-        }
-        const average = sum / dataArray.length;
-        // Perceptually scaled volume level (0 to 100)
-        const volumeLevel = Math.min(100, Math.round((average / 60) * 100));
-        if (onVolumeChange) {
-          onVolumeChange(volumeLevel);
-        }
-        animFrameId = requestAnimationFrame(checkVolume);
-      };
-
-      checkVolume();
+  const clearTimers = () => {
+    if (autoStopTimer) {
+      clearTimeout(autoStopTimer);
+      autoStopTimer = null;
     }
-  } catch (err) {
-    console.warn('AudioContext no disponible para visualizador de volumen:', err);
-  }
+    if (warningTimer) {
+      clearTimeout(warningTimer);
+      warningTimer = null;
+    }
+  };
+
+  // 2. Real-time microphone meter. The shared monitor is also exposed through
+  // the useAudioLevelMeter(stream) hook for components that own the stream.
+  const levelMonitor = onVolumeChange
+    ? createAudioLevelMonitor(stream, (reading) => onVolumeChange(reading.volume))
+    : null;
 
   // 3. Web Speech Recognition (client-side real-time transcription)
   let speechTranscript = '';
@@ -215,94 +328,121 @@ export async function startAudioRecording(
     console.warn('SpeechRecognition no disponible:', e);
   }
 
+  const cleanup = (abortRecognition = false) => {
+    clearTimers();
+    if (levelMonitor) levelMonitor.stop();
+    if (recognitionInstance) {
+      try {
+        if (abortRecognition) recognitionInstance.abort();
+        else recognitionInstance.stop();
+      } catch {}
+    }
+    stream.getTracks().forEach((track) => track.stop());
+  };
+
+  const finalize = async (): Promise<AudioRecordingResult> => {
+    if (finalized) return finalResult;
+    finalized = true;
+    cleanup();
+
+    const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
+    const audioBlob = new Blob(audioChunks, { type: actualMimeType });
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const base64Audio = await blobToBase64(audioBlob);
+
+    let finalTranscript = speechTranscript;
+
+    // If client-side SpeechRecognition didn't capture text, transcribe via Gemini server endpoint
+    if (!finalTranscript.trim() && base64Audio && base64Audio.length > 100) {
+      try {
+        const res = await fetch('/api/transcribe-audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioBase64: base64Audio,
+            mimeType: actualMimeType,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.transcript) {
+            finalTranscript = data.transcript;
+          }
+        }
+      } catch (err) {
+        console.warn('Fallo transcripción server:', err);
+      }
+    }
+
+    const result: AudioRecordingResult = {
+      audioBlob,
+      audioUrl,
+      base64Audio,
+      transcript: finalTranscript,
+      durationSeconds,
+    };
+
+    resolveFinal?.(result);
+    return result;
+  };
+
+  // 4. Hardware auto-stop: never record more than maxDurationSeconds, and warn
+  // shortly before the limit so the UI can play an auditory/visual cue.
+  mediaRecorder.onstop = () => {
+    void finalize().then((result) => {
+      if (autoStopped) {
+        onAutoStop?.(result);
+      }
+    });
+  };
+
+  if (maxDurationSeconds > 0) {
+    if (maxDurationSeconds > AUTO_STOP_WARNING_SECONDS) {
+      warningTimer = setTimeout(() => {
+        onTimeWarning?.(AUTO_STOP_WARNING_SECONDS);
+      }, (maxDurationSeconds - AUTO_STOP_WARNING_SECONDS) * 1000);
+    }
+    autoStopTimer = setTimeout(() => {
+      autoStopped = true;
+      onTimeWarning?.(0);
+      if (mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+      } else {
+        void finalize();
+      }
+    }, maxDurationSeconds * 1000);
+  }
+
   // Start recording with 250ms timeslices for stream stability
   mediaRecorder.start(250);
 
   // Controller
   return {
+    stream,
     stop: (): Promise<AudioRecordingResult> => {
-      return new Promise((resolve) => {
-        const cleanup = () => {
-          if (animFrameId) cancelAnimationFrame(animFrameId);
-          if (audioContext && audioContext.state !== 'closed') {
-            audioContext.close().catch(() => {});
-          }
-          if (recognitionInstance) {
-            try {
-              recognitionInstance.stop();
-            } catch {}
-          }
-          stream.getTracks().forEach((track) => track.stop());
-        };
-
-        mediaRecorder.onstop = async () => {
-          cleanup();
-          const durationSeconds = Math.max(1, Math.round((Date.now() - startTime) / 1000));
-          const audioBlob = new Blob(audioChunks, { type: actualMimeType });
-          const audioUrl = URL.createObjectURL(audioBlob);
-          const base64Audio = await blobToBase64(audioBlob);
-
-          let finalTranscript = speechTranscript;
-
-          // If client-side SpeechRecognition didn't capture text, transcribe via Gemini server endpoint
-          if (!finalTranscript.trim() && base64Audio && base64Audio.length > 100) {
-            try {
-              const res = await fetch('/api/transcribe-audio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  audioBase64: base64Audio,
-                  mimeType: actualMimeType,
-                }),
-              });
-              if (res.ok) {
-                const data = await res.json();
-                if (data.transcript) {
-                  finalTranscript = data.transcript;
-                }
-              }
-            } catch (err) {
-              console.warn('Fallo transcripción server:', err);
-            }
-          }
-
-          resolve({
-            audioBlob,
-            audioUrl,
-            base64Audio,
-            transcript: finalTranscript,
-            durationSeconds,
-          });
-        };
-
+      if (!finalized) {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
         } else {
-          cleanup();
-          resolve({
-            audioBlob: new Blob(),
-            audioUrl: '',
-            base64Audio: '',
-            transcript: speechTranscript,
-            durationSeconds: 0,
-          });
+          void finalize();
         }
-      });
+      }
+      return finalResult;
     },
     cancel: () => {
-      if (animFrameId) cancelAnimationFrame(animFrameId);
-      if (audioContext && audioContext.state !== 'closed') {
-        audioContext.close().catch(() => {});
-      }
-      if (recognitionInstance) {
-        try {
-          recognitionInstance.abort();
-        } catch {}
-      }
-      stream.getTracks().forEach((track) => track.stop());
+      if (finalized) return;
+      finalized = true;
+      cleanup(true);
       if (mediaRecorder.state === 'recording') {
         mediaRecorder.stop();
       }
+      resolveFinal?.({
+        audioBlob: new Blob(),
+        audioUrl: '',
+        base64Audio: '',
+        transcript: speechTranscript,
+        durationSeconds: 0,
+      });
     },
   };
 }
