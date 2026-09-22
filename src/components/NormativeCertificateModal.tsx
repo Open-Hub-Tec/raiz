@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { DigitalPassportLot } from '../types';
+import { generateQrSvg } from '../utils/qrCode';
 
 interface NormativeCertificateModalProps {
   isOpen: boolean;
   lot: DigitalPassportLot | null;
   onClose: () => void;
   onShareInChat?: (lot: DigitalPassportLot) => void;
+  onOpenQrTag?: (lot: DigitalPassportLot) => void;
 }
 
 export const NormativeCertificateModal: React.FC<NormativeCertificateModalProps> = ({
   isOpen,
   lot,
   onClose,
-  onShareInChat
+  onShareInChat,
+  onOpenQrTag
 }) => {
   const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'ready'>('idle');
   const [copied, setCopied] = useState(false);
@@ -229,6 +232,17 @@ export const NormativeCertificateModal: React.FC<NormativeCertificateModalProps>
       LEDGER STELLAR: #${compliance?.stellarTxLedger || '52,491,802'}<br/>
       HASH DE TRANSACCIÓN SHA-256: ${compliance?.stellarTxHash || `${lot.hash}7a98bc19d44e510f2c814407ab198762f0592`}<br/>
       ESTADO: REGISTRO INMUTABLE Y CRIPTOGRÁFICAMENTE VERIFICADO
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; border: 2px dashed #1b3b2b; border-radius: 12px; padding: 14px 18px; margin-top: 20px; background: #fcf9f3;">
+    <div>
+      <div style="font-size: 13px; font-weight: bold; color: #032517;">CÓDIGO QR DE AUDITORÍA Y TRAZABILIDAD EN VIVO</div>
+      <div style="font-size: 11px; color: #424843; margin: 4px 0;">Escanee con la cámara de su teléfono para verificar este dictamen directamente en la red pública Stellar.</div>
+      <div style="font-size: 10px; font-family: monospace; color: #a73918; word-break: break-all;">${shareUrl}</div>
+    </div>
+    <div style="background: #fff; padding: 8px; border-radius: 8px; border: 1px solid #c1c8c2; flex-shrink: 0; margin-left: 14px;">
+      ${generateQrSvg(shareUrl, { size: 130, margin: 2, color: '#032517' })}
     </div>
   </div>
 
@@ -532,6 +546,17 @@ export const NormativeCertificateModal: React.FC<NormativeCertificateModalProps>
                 <span>Más Opciones</span>
               </button>
             </div>
+
+            {onOpenQrTag && (
+              <button
+                type="button"
+                onClick={() => onOpenQrTag(lot)}
+                className="w-full mt-1.5 h-9.5 border border-[#a73918]/50 bg-white hover:bg-[#ffdbd1]/20 text-[#032517] rounded-xl font-bold text-[11.5px] flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer shadow-2xs"
+              >
+                <span className="material-symbols-outlined text-[17px] text-[#a73918]">qr_code_2</span>
+                <span>Generar Etiqueta QR Física para Colgar (Hang-tag)</span>
+              </button>
+            )}
           </div>
         </div>
 

@@ -7,6 +7,7 @@ interface MyLotsModalProps {
   lots: DigitalPassportLot[];
   onSelectLot: (lot: DigitalPassportLot) => void;
   onRegisterNewLot: () => void;
+  onOpenQrTag?: (lot: DigitalPassportLot) => void;
 }
 
 export const MyLotsModal: React.FC<MyLotsModalProps> = ({
@@ -14,7 +15,8 @@ export const MyLotsModal: React.FC<MyLotsModalProps> = ({
   onClose,
   lots,
   onSelectLot,
-  onRegisterNewLot
+  onRegisterNewLot,
+  onOpenQrTag
 }) => {
   if (!isOpen) return null;
 
@@ -91,10 +93,26 @@ export const MyLotsModal: React.FC<MyLotsModalProps> = ({
                   <span className="material-symbols-outlined text-[14px] text-[#a73918]">pin_drop</span>
                   {lot.location}
                 </span>
-                <span className="font-bold text-[#032517] flex items-center gap-0.5 group-hover:underline">
-                  Ver Pasaporte Digital
-                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-                </span>
+                <div className="flex items-center gap-2">
+                  {onOpenQrTag && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenQrTag(lot);
+                      }}
+                      className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-[#a73918] font-bold text-[11px] flex items-center gap-1 border border-amber-300/60 transition-all cursor-pointer"
+                      title="Ver e imprimir etiqueta QR de este lote"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">qr_code_2</span>
+                      <span>Etiqueta QR</span>
+                    </button>
+                  )}
+                  <span className="font-bold text-[#032517] flex items-center gap-0.5 group-hover:underline">
+                    Ver Pasaporte
+                    <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                  </span>
+                </div>
               </div>
             </div>
           ))}
