@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useAudioRecordingSession } from '../hooks/useAudioRecordingSession';
 import { AppLanguage, ScreenView } from '../types';
-import { startAudioRecording, LiveRecorderSession } from '../utils/audioRecorder';
+import { LiveRecorderSession } from '../utils/audioRecorder';
 
 interface MainMenuScreenProps {
   onNavigateScreen: (screen: ScreenView) => void;
@@ -28,7 +29,7 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
   const [numericInput, setNumericInput] = useState('');
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [recordingSeconds, setRecordingSeconds] = useState<number>(0);
-  const [audioVolume, setAudioVolume] = useState<number>(0);
+  const { startRecording, audioLevel: audioVolume, releaseAudioUrl } = useAudioRecordingSession();
   const [liveTranscript, setLiveTranscript] = useState<string>('');
   const [micStatusMessage, setMicStatusMessage] = useState<string | null>(null);
   const [recognizedOptionToast, setRecognizedOptionToast] = useState<string | null>(null);
@@ -152,18 +153,19 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
     setNumericInput('');
   };
 
-  const toggleVoiceMenuRecording = async () => {
-    if (isRecording) {
+  const toggleVoiceMenuRecording = async (automatic = false) => {
+    if (isRecording || automatic) {
       // STOP recording
       setIsRecording(false);
-      setAudioVolume(0);
       if (timerRef.current) clearInterval(timerRef.current);
 
       if (recorderSessionRef.current) {
         try {
-          const result = await recorderSessionRef.current.stop();
+          const session = recorderSessionRef.current;
           recorderSessionRef.current = null;
+          const result = await session.stop();
           const transcriptToEvaluate = (result.transcript || liveTranscript || '').trim();
+          releaseAudioUrl(result.audioUrl);
           const matched = matchMainMenuOption(transcriptToEvaluate);
 
           if (matched) {
@@ -176,44 +178,45 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
             setTimeout(() => setMicStatusMessage(null), 4000);
           }
         } catch (err: any) {
+          if (err?.name === 'AbortError') return;
           console.error(err);
           setMicStatusMessage('Error al procesar el audio del micrófono.');
         }
       }
     } else {
       // START recording
-      setMicStatusMessage(null);
-      setRecognizedOptionToast(null);
-      setLiveTranscript('');
-      setRecordingSeconds(0);
-
-      timerRef.current = setInterval(() => {
-        setRecordingSeconds((sec) => sec + 1);
-      }, 1000);
-
       try {
-        const session = await startAudioRecording({
-          onVolumeChange: (vol) => setAudioVolume(vol),
+        const session = await startRecording({
+          onStopped: (reason) => {
+            if (reason === 'limit' || reason === 'hidden' || reason === 'ended' || reason === 'error') void toggleVoiceMenuRecording(true);
+          },
           onInterimTranscript: (text) => {
             setLiveTranscript(text);
             const matched = matchMainMenuOption(text);
             if (matched) {
               // Early trigger if high confidence
               if (recorderSessionRef.current) {
-                recorderSessionRef.current.stop();
+                recorderSessionRef.current.cancel();
                 recorderSessionRef.current = null;
               }
               setIsRecording(false);
-              setAudioVolume(0);
               if (timerRef.current) clearInterval(timerRef.current);
               executeMenuOption(matched);
             }
           },
           lang: 'es-MX',
         });
+        setMicStatusMessage(null);
+        setRecognizedOptionToast(null);
+        setLiveTranscript('');
+        setRecordingSeconds(0);
         recorderSessionRef.current = session;
+        timerRef.current = setInterval(() => {
+          setRecordingSeconds((sec) => sec + 1);
+        }, 1000);
         setIsRecording(true);
       } catch (err: any) {
+        if (err?.name === 'AbortError') return;
         console.warn('Error accediendo al micrófono:', err);
         setIsRecording(false);
         if (timerRef.current) clearInterval(timerRef.current);
@@ -231,7 +234,6 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
     }
     if (timerRef.current) clearInterval(timerRef.current);
     setIsRecording(false);
-    setAudioVolume(0);
     setLiveTranscript('');
     setMicStatusMessage(null);
   };
@@ -427,7 +429,7 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
           </div>
           <button
             type="button"
-            onClick={toggleVoiceMenuRecording}
+            onClick={() => toggleVoiceMenuRecording()}
             aria-label={isRecording ? 'Detener escucha de voz' : 'Hablar opción del menú'}
             className={`px-3 py-2 rounded-full font-bold text-[13px] flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 ${
               isRecording
@@ -470,7 +472,7 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
               <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-linear-to-r from-emerald-400 via-yellow-400 to-red-400 transition-all duration-75"
-                  style={{ width: `${Math.max(8, audioVolume)}%` }}
+                  style={{ width: `${audioVolume}%` }}
                 />
               </div>
               <span className="text-[10px] font-mono text-emerald-200">{audioVolume}%</span>
