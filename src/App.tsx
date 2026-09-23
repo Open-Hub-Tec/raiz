@@ -13,6 +13,7 @@ import { BuyerShowcaseScreen } from './components/BuyerShowcaseScreen';
 import { MyLotsModal } from './components/MyLotsModal';
 import { MyPaymentsModal } from './components/MyPaymentsModal';
 import { NormativeCertificateModal } from './components/NormativeCertificateModal';
+import { ArtisanQrTagModal } from './components/ArtisanQrTagModal';
 import { CartModal, CartItem } from './components/CartModal';
 import { RegionalMapModal } from './components/RegionalMapModal';
 import { MicrophoneDiagnosticModal } from './components/MicrophoneDiagnosticModal';
@@ -35,6 +36,8 @@ export default function App() {
   const [isLotsModalOpen, setIsLotsModalOpen] = useState(false);
   const [isPaymentsModalOpen, setIsPaymentsModalOpen] = useState(false);
   const [isDictamenModalOpen, setIsDictamenModalOpen] = useState(false);
+  const [isQrTagModalOpen, setIsQrTagModalOpen] = useState(false);
+  const [qrLot, setQrLot] = useState<DigitalPassportLot | null>(null);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [isMicDiagnosticModalOpen, setIsMicDiagnosticModalOpen] = useState(false);
@@ -64,11 +67,12 @@ export default function App() {
       const urlParams = new URLSearchParams(window.location.search);
       const rawParam = urlParams.get('cert') || urlParams.get('lote') || urlParams.get('dictamen');
       if (rawParam) {
-        const cleanParam = rawParam.replace(/^MX-/i, '').toLowerCase();
+        const cleanParam = rawParam.replace(/^(MX-)+/i, '').toLowerCase();
         const found = lots.find(
           (l) =>
             l.code.toLowerCase() === rawParam.toLowerCase() ||
             l.code.toLowerCase() === cleanParam ||
+            l.code.toLowerCase() === `mx-${cleanParam}` ||
             l.id.toLowerCase() === rawParam.toLowerCase() ||
             l.id.toLowerCase() === cleanParam ||
             l.code.toLowerCase().includes(cleanParam)
@@ -110,6 +114,16 @@ export default function App() {
     } else {
       setCurrentTab('menu');
     }
+  };
+
+  // Open QR Tag Modal handler
+  const handleOpenQrTag = (lot?: DigitalPassportLot) => {
+    if (lot) {
+      setQrLot(lot);
+    } else {
+      setQrLot(selectedLot);
+    }
+    setIsQrTagModalOpen(true);
   };
 
   // Cart operations
@@ -385,6 +399,7 @@ export default function App() {
           lot={selectedLot}
           onNavigateScreen={handleNavigateScreen}
           onOpenDictamen={() => setIsDictamenModalOpen(true)}
+          onOpenQrTag={handleOpenQrTag}
           onDirectMessageProducer={handleDirectContact}
           onAddToCart={handleAddToCart}
           elderMode={elderMode}
@@ -431,6 +446,7 @@ export default function App() {
           setCurrentScreen('pasaporte_digital');
         }}
         onRegisterNewLot={() => handleNavigateScreen('catalogo_producto')}
+        onOpenQrTag={handleOpenQrTag}
       />
 
       <MyPaymentsModal
@@ -461,6 +477,13 @@ export default function App() {
           setCurrentTab('chat');
           setCurrentScreen('registro_productor');
         }}
+        onOpenQrTag={handleOpenQrTag}
+      />
+
+      <ArtisanQrTagModal
+        isOpen={isQrTagModalOpen}
+        onClose={() => setIsQrTagModalOpen(false)}
+        lot={qrLot || selectedLot}
       />
 
       <CartModal

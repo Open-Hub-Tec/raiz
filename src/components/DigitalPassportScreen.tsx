@@ -5,6 +5,7 @@ interface DigitalPassportScreenProps {
   lot: DigitalPassportLot;
   onNavigateScreen: (screen: ScreenView) => void;
   onOpenDictamen: (lot: DigitalPassportLot) => void;
+  onOpenQrTag?: (lot: DigitalPassportLot) => void;
   onDirectMessageProducer: (producerName: string) => void;
   onAddToCart: (item: {
     id: string;
@@ -24,6 +25,7 @@ export const DigitalPassportScreen: React.FC<DigitalPassportScreenProps> = ({
   lot,
   onNavigateScreen,
   onOpenDictamen,
+  onOpenQrTag,
   onDirectMessageProducer,
   onAddToCart,
   elderMode = false,
@@ -272,6 +274,17 @@ export const DigitalPassportScreen: React.FC<DigitalPassportScreenProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
+                  {onOpenQrTag && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenQrTag(lot)}
+                      className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white font-bold text-[10px] rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1"
+                      title="Generar e imprimir etiqueta QR física"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">qr_code_2</span>
+                      <span>Etiqueta QR</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => onOpenDictamen(lot)}
@@ -382,7 +395,36 @@ export const DigitalPassportScreen: React.FC<DigitalPassportScreenProps> = ({
               </span>
             </button>
 
-            {/* Option 2: Message Producer */}
+            {/* Option 2: Printable QR Tag */}
+            {onOpenQrTag && (
+              <button
+                type="button"
+                onClick={() => onOpenQrTag(lot)}
+                className="min-h-[50px] bg-[#fcf9f3] hover:bg-[#f6f3ed] active:scale-[0.98] transition-all rounded-xl p-3 flex items-center justify-between text-left group cursor-pointer border border-[#a73918]/30 shadow-2xs"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="w-7 h-7 rounded-full bg-[#a73918] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                    2
+                  </span>
+                  <div>
+                    <p className="text-[14px] font-bold text-[#032517] flex items-center gap-1.5">
+                      <span>Generar e Imprimir Etiqueta QR de Autenticidad</span>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">
+                        Offline
+                      </span>
+                    </p>
+                    <p className="text-[12px] text-[#424843]">
+                      Etiqueta física (Hang-tag) para colgar al bulto de cosecha o coser a la artesanía
+                    </p>
+                  </div>
+                </div>
+                <span className="material-symbols-outlined text-[#a73918] group-hover:scale-110 transition-transform">
+                  qr_code_2
+                </span>
+              </button>
+            )}
+
+            {/* Option 3: Message Producer */}
             <button
               type="button"
               onClick={() => onDirectMessageProducer(lot.producerName)}
@@ -390,7 +432,7 @@ export const DigitalPassportScreen: React.FC<DigitalPassportScreenProps> = ({
             >
               <div className="flex items-center gap-3">
                 <span className="w-7 h-7 rounded-full bg-[#a73918] text-white flex items-center justify-center font-bold text-xs shrink-0">
-                  2
+                  {onOpenQrTag ? '3' : '2'}
                 </span>
                 <div>
                   <p className="text-[14px] font-bold text-[#1c1c18]">

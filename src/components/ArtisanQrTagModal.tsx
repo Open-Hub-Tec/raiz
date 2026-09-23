@@ -1,5 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { DigitalPassportLot } from '../types';
+import { generateQrDataUri, generateQrSvg } from '../utils/qrCode';
 
 interface ArtisanQrTagModalProps {
   isOpen: boolean;
@@ -10,7 +11,7 @@ interface ArtisanQrTagModalProps {
 /**
  * Printable Artisan / Micro-lot Authenticity Tag with Scannable QR Code.
  * Tailored for physical attachment to artisanal textiles, coffee bags,
- * honey jars, or palm hats.
+ * honey jars, or palm hats. Works 100% offline in rural Oaxaca.
  */
 export const ArtisanQrTagModal: React.FC<ArtisanQrTagModalProps> = ({
   isOpen,
@@ -18,26 +19,75 @@ export const ArtisanQrTagModal: React.FC<ArtisanQrTagModalProps> = ({
   lot
 }) => {
   const printableTagRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Normalize Folio code (avoid duplicated 'MX-' prefix)
+  const formattedCode = useMemo(() => {
+    return lot.code.startsWith('MX-') ? lot.code : `MX-${lot.code}`;
+  }, [lot.code]);
+
+  // Scannable deep-link URL (e.g. https://domain.com/?cert=MX-2024-912)
+  const qrPayloadUrl = useMemo(() => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://raiz.tecnm.mx';
+    return `${origin}/?cert=${encodeURIComponent(formattedCode)}`;
+  }, [formattedCode]);
+
+  // Zero-dependency offline vector QR SVG & Data URI
+  const offlineQrDataUri = useMemo(() => {
+    try {
+      return generateQrDataUri(qrPayloadUrl, {
+        size: 240,
+        margin: 4,
+        color: '#032517',
+        bgColor: '#ffffff',
+        level: 'M'
+      });
+    } catch (err) {
+      console.error('Error generating offline QR:', err);
+      // Fallback to public QR server if string encoding fails
+      return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
+        qrPayloadUrl
+      )}&margin=6&color=032517`;
+    }
+  }, [qrPayloadUrl]);
 
   if (!isOpen) return null;
-
-  const qrPayloadUrl = `${window.location.origin}/?cert=MX-${lot.code}`;
-  // Standard SVG QR generation via public QR API
-  const qrImageSrc = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
-    qrPayloadUrl
-  )}&margin=6&color=032517`;
 
   const handlePrint = () => {
     window.print();
   };
 
+  const handleCopyLink = async () => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(qrPayloadUrl);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = qrPayloadUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch (err) {
+      console.error('Error al copiar enlace:', err);
+    }
+  };
+
   const isArtisanItem =
-    lot.variety.toLowerCase().includes('telar') ||
-    lot.variety.toLowerCase().includes('palma') ||
-    lot.variety.toLowerCase().includes('textil') ||
+    lot.variety?.toLowerCase().includes('telar') ||
+    lot.variety?.toLowerCase().includes('palma') ||
+    lot.variety?.toLowerCase().includes('textil') ||
     lot.title.toLowerCase().includes('rebozo') ||
     lot.title.toLowerCase().includes('sombrero') ||
-    lot.title.toLowerCase().includes('telar');
+    lot.title.toLowerCase().includes('telar') ||
+    lot.title.toLowerCase().includes('tenate') ||
+    lot.title.toLowerCase().includes('huipil');
 
   return (
     <div
@@ -97,17 +147,17 @@ export const ArtisanQrTagModal: React.FC<ArtisanQrTagModalProps> = ({
               Certificado de Origen y Trazabilidad Inmutable
             </p>
 
-            {/* QR Code Container */}
-            <div className="my-3 bg-white p-2.5 rounded-xl border border-[#c1c8c2]/50 shadow-2xs">
+            {/* QR Code Container (Vector SVG - Offline & Sharp for printing) */}
+            <div className="my-3 bg-white p-2 rounded-xl border border-[#c1c8c2]/50 shadow-2xs">
               <img
-                src={qrImageSrc}
-                alt={`Código QR para el lote ${lot.code}`}
+                src={offlineQrDataUri}
+                alt={`Código QR para el lote ${formattedCode}`}
                 className="w-44 h-44 object-contain"
               />
             </div>
 
             <div className="text-[11px] font-mono font-black text-[#a73918] bg-[#ffdbd1]/80 px-2.5 py-0.5 rounded-full tracking-wider mb-2">
-              FOLIO: MX-{lot.code}
+              FOLIO: {formattedCode}
             </div>
 
             {/* Artisan & Piece Info */}
@@ -143,7 +193,7 @@ export const ArtisanQrTagModal: React.FC<ArtisanQrTagModalProps> = ({
           </div>
 
           <p className="text-[11px] text-[#727973] mt-3 text-center">
-            Diseñada con medidas estándar para impresión térmica o cartulina kraft de taller.
+            Generada sin conexión para impresión térmica o cartulina kraft de taller.
           </p>
         </div>
 
@@ -165,7 +215,7 @@ export const ArtisanQrTagModal: React.FC<ArtisanQrTagModalProps> = ({
                 `*Obra:* ${lot.title}\n` +
                 `*Autor(a):* ${lot.producerName}\n` +
                 `*Comunidad:* ${lot.location}\n` +
-                `*Folio:* MX-${lot.code}\n` +
+                `*Folio:* ${formattedCode}\n` +
                 `*Verificar en línea:* ${qrPayloadUrl}`;
               const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
               window.open(url, '_blank', 'noopener,noreferrer');
@@ -176,13 +226,26 @@ export const ArtisanQrTagModal: React.FC<ArtisanQrTagModalProps> = ({
             <span>Compartir Enlace QR por WhatsApp</span>
           </button>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full h-9 text-[#5e6660] hover:text-[#032517] font-semibold text-[13px] cursor-pointer"
-          >
-            Volver
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="flex-1 h-9 border border-[#c1c8c2] hover:bg-[#f0eee8] text-[#032517] rounded-full font-semibold text-[12px] flex items-center justify-center gap-1.5 active:scale-98 transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[15px]">
+                {copied ? 'check' : 'link'}
+              </span>
+              <span>{copied ? '¡Copiado!' : 'Copiar Enlace'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 h-9 text-[#5e6660] hover:text-[#032517] font-semibold text-[13px] cursor-pointer"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       </div>
     </div>
