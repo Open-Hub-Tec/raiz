@@ -7,10 +7,10 @@
 
 ---
 
-## 👥 Equipo de Evaluación de Usabilidad
-* **Investigadores:** Castro Rodríguez Charlie Jared, Reyez Hernández Dulce Maetzy, Brayan Armando Pérez González, José Manuel Hernández Paz (5º Semestre Grupo B).
-* **Participante Evaluada:** Doña Reyna (56 años, artesana tejedora en telar de cintura de San José Xochixtlán, hablante nativa de Triqui, experiencia tecnológica básica con smartphone).
-* **Dispositivo de Prueba:** Teléfono móvil estándar Android simulando condiciones de campo rural.
+## 👥 Equipos de Evaluación de Usabilidad
+* **Equipo A (San José Xochixtlán - Textil Triqui):** Castro Rodríguez Charlie Jared, Reyez Hernández Dulce Maetzy, Brayan Armando Pérez González, José Manuel Hernández Paz (5º Semestre Grupo B). Participante: Doña Reyna (56 años).
+* **Equipo E (San Juan Mixtepec - Palma):** Jazlynn Barrios Velasco, Isaías Brayan López Dominguez, Rafael Ayala Coronel, Alex Antonio Victoria Vasquez (7º Semestre Grupo 7US). Participante: Doña Juana (68 años). Detalle: [`docs/ux-testing/auditoria_ux_artesanas_palma_mixtepec.md`](./auditoria_ux_artesanas_palma_mixtepec.md).
+* **Dispositivo de Prueba:** Teléfono móvil estándar Android simulando condiciones de campo rural bajo luz solar directa.
 
 ---
 
