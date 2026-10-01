@@ -1,0 +1,43 @@
+### 📋 Field Pain Validation Sheet: [INTERVIEW #01]
+
+#### 1. General Info
+- **Community:** Tlaxiaco, Oaxaca
+- **Artisan/Farmer:** Guadalupe Avendaño Reyes (family baker / artisanal producer)
+- **Native Language:** Spanish
+
+#### 2. The Economic Pain & Injustice (Real Numbers)
+- **Craft piece / Product:** Traditional cemitas made by hand.
+- **Time invested:** 3 to 4 hours of manual work per production batch, spread across mixing, kneading, shaping, and baking.
+- **Out-of-pocket material cost:** Variable by batch, but the most expensive inputs are flour and panela; the family also depends on fresh yeast and salt.
+- **Price paid by the buyer / reseller:** Most sales are direct to customers and occasional resellers; the family does not use a formal coyote system, but there is pressure from intermediated sales and large orders.
+- **Price the intermediary resells it for:** Resellers often buy in bulk and add 20% to 30% to the final price.
+- **Fair price the artisan asks for:** A price that covers raw materials, labor, fuel, and keeps the family production viable without depending on exploitative resale margins.
+
+#### 3. Specific Abuses Reported
+- *"When it is very cold, the dough dries out and cracks; the product loses quality and shape."*
+- *"When it rains, the dough becomes humid and sticky, so it stretches too much and comes out misshapen."*
+- *"The oven only fits around 40 pieces per batch, so production is slow and limited."*
+- *"There is a shortage of workers; if a person learns the process, they often leave, and the family has to keep doing everything by hand."*
+
+#### 4. Cultural Plagiarism
+- This interview does not document direct counterfeit copying of a protected traditional pattern, but it does show a broader issue of artisanal knowledge being undervalued and difficult to scale without external labor or commercial support.
+
+#### 5. Audio Testimony in Spanish
+- **Audio file:** `audio_testimonies/ENT-01-guadalupe-avendano-cemitas.m4a`
+- **Spanish translation:** *"La cemita se hace paso a paso: primero se enciende el horno, luego se revuelven los ingredientes, se soba, se embolla, se cortan los pedazos y se hornean. Cada etapa es importante porque si se salta un paso, el producto no sale bien. El trabajo es muy cansado y depende mucho del clima: con frío se reseca y con lluvia se pone húmeda. El proceso sigue siendo artesanal y se hace a mano, pero necesita más apoyo humano para poder crecer sin perder la calidad."*
+
+---
+
+## 📝 Student/Team Information
+- **Name(s):** [Estudiante o equipo]
+- **Institution:** [Universidad o institución]
+- **Date of Interview:** 2026-10-01
+- **Location/GPS Coordinates (optional):** Tlaxiaco, Oaxaca, México
+
+## 📷 Supporting Media
+- Photos: `[archivo.jpg]`
+- Audio testimony: `audio_testimonies/ENT-01-guadalupe-avendano-cemitas.m4a`
+- Other documents: `[archivo.pdf]`
+
+## 🔗 Related Issue
+This interview supports the requirements of Issue #1: Research Milestone 1.1 - Field Pain-Point & Economic Exploitation Validation.
