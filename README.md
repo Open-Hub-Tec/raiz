@@ -29,6 +29,47 @@ Conceived in the mountainous Mixteca Highlands of Oaxaca (**Heroica Ciudad de Tl
 
 ---
 
+## ⚡ Executive Summary in 60 Seconds
+
+* **The Problem:** Smallholder indigenous coffee farmers, beekeepers, and textile artisans in Oaxaca lose up to 70% of their product value to predatory middlemen (*coyotes*), face systematic counterfeiting from industrial knockoffs, and are 100% excluded from digital banking (no internet in parcels, no credit cards, language barriers in *Tu'un Savi*).
+* **The Solution:** An **Offline-First Voice PWA** that allows an elder artisan to register a harvest by voice without typing. The system computes a cryptographic SHA-256 digest, prints a physical ISO/IEC 18004 hang-tag QR, anchors verifiable attestations on Stellar/Soroban, and locks purchase funds in milestone-based escrow.
+* **The Impact:** When delivered, funds are converted from on-chain USDC directly into local Mexican Pesos (**MXN**) via Banxico SPEI into Banco del Bienestar debit cards or cash via local transport cooperatives (MicoPay)—with **0% exploitative fees to the producer**.
+
+---
+
+## 🗺️ End-to-End User Journey Map
+
+How a coffee grower or textile artisan interacts with Raíz—step by step, with direct links to the implementation code:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ 1. PARCEL REGISTRATION ──▶ 2. CRYPTOGRAPHIC TWIN ──▶ 3. ESCROW FUNDING ──▶ 4. SETTLEMENT & PAYOUT      │
+│ (Offline / Voice)          (Hang-Tag QR & Ledger)     (Soroban Milestone)     (Banxico SPEI / Cash)    │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Step | User & System Action | Technical Component & Direct Code Link |
+| :---: | :--- | :--- |
+| **1** | **Oral Harvest Log (Offline):** Don Juan presses the 112px voice button in Yucuhiti, speaking in *Tu'un Savi*: *"Kuni yu kiti 120 kilos café pergamino"*. Audio is encoded at 24kbps Opus without cell signal. | [`src/components/VoiceAssistantModal.tsx`](./src/components/VoiceAssistantModal.tsx)<br>[`src/core/sync/IndexedDbOutbox.ts`](./src/core/sync/IndexedDbOutbox.ts) |
+| **2** | **Cryptographic Digital Twin:** The system extracts metadata, computes the canonical SHA-256 Community Digest, and generates a printable vector SVG hang-tag QR for the physical coffee sack. | [`src/core/crypto/CryptoEngine.ts`](./src/core/crypto/CryptoEngine.ts)<br>[`src/components/PhysicalQRCard.tsx`](./src/components/PhysicalQRCard.tsx) |
+| **3** | **B2B Escrow Lock (Soroban):** A specialty coffee buyer in Zurich or CDMX inspects the digital lot passport and locks $10,000 MXNe in an audited milestone escrow contract. | [`contracts/fair_escrow/`](./contracts/fair_escrow/)<br>[`src/core/blockchain/TrustlessWorkEscrowAdapter.ts`](./src/core/blockchain/TrustlessWorkEscrowAdapter.ts) |
+| **4** | **Milestone 1 Release (30%):** The Tlaxiaco Cooperative Oracle signs the origin & quality attestation conforming to the SEP-RWA standard. A 30% advance ($3,000 MXN) is released to the producer. | [`docs/standards/SEP_RWA_ATTESTATION_DRAFT.md`](./docs/standards/SEP_RWA_ATTESTATION_DRAFT.md)<br>[`src/core/ai/RaizAIOracles.ts`](./src/core/ai/RaizAIOracles.ts) |
+| **5** | **Physical Delivery & Final Payout (70%):** Sacks are delivered to the Tlaxiaco warehouse. Scanning the physical QR triggers the release of the remaining 70% ($7,000 MXN) directly to Don Juan's card or in cash via MicoPay. | [`src/core/blockchain/MultiAnchorSettlementRouter.ts`](./src/core/blockchain/MultiAnchorSettlementRouter.ts)<br>[`docs/adr/ADR-001-TRUSTLESS-WORK-ESCROW.md`](./docs/adr/ADR-001-TRUSTLESS-WORK-ESCROW.md) |
+
+---
+
+## 🏛️ Interactive Architecture Map (With Codebase Links)
+
+| Architecture Layer | Responsibilities | Key Files & Modules in Repo |
+| :--- | :--- | :--- |
+| **Layer 1: Rural Client (PWA)** | Voice-first accessible UI ("Modo Abuelo"), 112px touch targets, zero-seed authentication, offline caching. | [`src/App.tsx`](./src/App.tsx)<br>[`src/components/MainMenuScreen.tsx`](./src/components/MainMenuScreen.tsx)<br>[`src/components/VoiceAssistantModal.tsx`](./src/components/VoiceAssistantModal.tsx) |
+| **Layer 2: Core Domain Engine** | ACID outbox persistence, reactive sync listeners, canonical SHA-256 hashing, ISO/IEC 18004 vector QR generation. | [`src/core/crypto/CryptoEngine.ts`](./src/core/crypto/CryptoEngine.ts)<br>[`src/core/sync/IndexedDbOutbox.ts`](./src/core/sync/IndexedDbOutbox.ts)<br>[`src/core/policy/FairTradeEngine.ts`](./src/core/policy/FairTradeEngine.ts) |
+| **Layer 3: Autonomous AI Oracles** | Multimodal acoustic parser (*Tu'un Savi*), SCAA quality vision scoring, EUDR satellite anti-deforestation proof. | [`src/core/ai/RaizAIOracles.ts`](./src/core/ai/RaizAIOracles.ts)<br>[`src/components/ProtocolInfrastructureModal.tsx`](./src/components/ProtocolInfrastructureModal.tsx) |
+| **Layer 4: Soroban Smart Contracts** | Immutable lot registry, verifiable RWA attestation registry, and Trustless Work milestone escrow on Stellar. | [`contracts/lot_passport/`](./contracts/lot_passport/)<br>[`contracts/fair_escrow/`](./contracts/fair_escrow/)<br>[`docs/standards/SEP_RWA_ATTESTATION_DRAFT.md`](./docs/standards/SEP_RWA_ATTESTATION_DRAFT.md) |
+| **Layer 5: Fiat Settlement Rails** | Atomic swap from on-chain USDC/MXNe to Banxico SPEI interbank transfers and rural cash-in-hand parcel network. | [`src/core/blockchain/MultiAnchorSettlementRouter.ts`](./src/core/blockchain/MultiAnchorSettlementRouter.ts)<br>[`docs/adr/ADR-001-TRUSTLESS-WORK-ESCROW.md`](./docs/adr/ADR-001-TRUSTLESS-WORK-ESCROW.md) |
+
+---
+
 ## 🌾 The Empirical Field Research Moat
 
 The foundational pillar of Raíz is not code generated in isolation, but **rigorous empirical field research** conducted on territory by student engineering brigades from TecNM Campus Tlaxiaco. This represents the irreplaceable human moat of the project:
