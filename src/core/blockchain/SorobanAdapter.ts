@@ -2,7 +2,14 @@
  * Raíz Core - Adaptador de Contratos Soroban y Red Stellar
  * Define las interfaces de invocación a los contratos de la red:
  * - LotPassport (Contrato de Pasaporte y Trazabilidad de Cosechas)
- * - FairEscrow (Contrato de Custodia y Pagos Condicionados)
+ * - FairEscrow / Trustless Work (Contrato de Custodia y Pagos Condicionados)
+ *
+ * NOTA TÉCNICA (AUDITORÍA & REVIEWERS):
+ * Este adaptador opera en modo Sandbox / Mock de Testnet para el prototipo PWA y pruebas
+ * unitarias locales. Permite probar la experiencia de usuario y validación criptográfica
+ * sin requerir balance de testnet ni latencia de red.
+ * El código fuente compilable de los contratos inteligentes reside en `/contracts`
+ * para despliegue formal en Soroban Testnet (Protocol 22).
  */
 
 export interface SorobanContractConfig {
@@ -10,6 +17,7 @@ export interface SorobanContractConfig {
   rpcUrl: string;
   lotPassportContractId: string;
   fairEscrowContractId: string;
+  isSandboxMode?: boolean;
 }
 
 export const DEFAULT_STELLAR_CONFIG: SorobanContractConfig = {
@@ -17,13 +25,16 @@ export const DEFAULT_STELLAR_CONFIG: SorobanContractConfig = {
   rpcUrl: 'https://soroban-testnet.stellar.org',
   lotPassportContractId: 'CA7MIXTECA_LOT_PASSPORT_CONTRACT_V1_TECNM',
   fairEscrowContractId: 'CB8MIXTECA_FAIR_ESCROW_CONTRACT_V1_TECNM',
+  isSandboxMode: true,
 };
 
 export class SorobanAdapter {
   private config: SorobanContractConfig;
+  public readonly isSandbox: boolean;
 
   constructor(config: SorobanContractConfig = DEFAULT_STELLAR_CONFIG) {
     this.config = config;
+    this.isSandbox = config.isSandboxMode ?? true;
   }
 
   /**
