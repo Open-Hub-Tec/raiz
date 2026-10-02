@@ -70,42 +70,6 @@ How a coffee grower or textile artisan interacts with Raíz—step by step, with
 
 ---
 
-## 🌾 The Empirical Field Research Moat
-
-The foundational pillar of Raíz is not code generated in isolation, but **rigorous empirical field research** conducted on territory by student engineering brigades from TecNM Campus Tlaxiaco. This represents the irreplaceable human moat of the project:
-
-### 1. In-Depth Field Interviews & Usability Audits (15 Individual Profiles + 3 Collectives)
-* **San Juan Ñumí (Honey):** The [Ñumí Honey Union Interviews](./docs/research/entrevista_union_miel_san_juan_numi.md) with Union President Rogelio Martínez and Inventory Head Guadalupe Ramírez form a textbook software requirements gathering case study on rural inventory desynchronization and cooperative trust.
-* **San Antonio Nduaxico (Tomato):** [Josué Gerardo Sanjuan](./docs/research/field-interviews/entrevista-02-josue-jitomate-nduaxico.md) documents the extreme vulnerability of perishable crops with a **maximum 5-day shelf life**, where buyers exploit urgency to impose sub-cost prices.
-* **San Juan Mixtepec (Palm Weaving):** [Doña Juana (68 years old)](./docs/ux-testing/TEST_02_MIXTEPEC_PALMA_UX.md) weaves fine palm hats for 3 weeks, paid at $60–$80 MXN by middlemen and resold at $450+ MXN in urban tourist centers.
-* **San Pablo Tijaltepec (Embroidery):** [Doña Francisca (64 years old)](./docs/ux-testing/TIJALTEPEC_FRICTION_AUDIT.md) demonstrates the impact of industrial machine knockoffs devaluing 6–9 months of ancestral needlework.
-* **San José Xochixtlán (Triqui Textile):** [Doña Reyna (56 years old)](./docs/research/HITO_1.1_VALIDACION_CAMPO.md) on backstrap loom huipiles facing arbitrary buyer price deductions upon delivery.
-* **Tlaxiaco (Fiber Crafts):** [Doña Felipa Hopilito (62 years old)](./docs/research/field-interviews/entrevista-03-felipa-hopilito-tlaxiaco.md) documents market space exclusion and informal street vending challenges.
-* **Tlaxiaco / Amoltepec (Traditional Wood-Fired Bakery):** [Guadalupe Avendaño](./docs/research/field-interviews/cemitas-amoltepec-guadalupe-avendano/ENTREVISTA-01-doña-rosa-amoltepec.md) on climate vulnerabilities and lack of generational workforce turnover.
-
-### 2. Scientific Nuance: The Counter-Example of Doña Mercedes Cruz
-Demonstrating field authenticity over contrived marketing, [Mercedes Cruz (5th generation chocolate artisan)](./docs/research/field-interviews/entrevista-01-mercedes-cruz/INTERVIEW-SUMMARY.md) documented that **she does not suffer from predatory middlemen**, having established direct-to-consumer and restaurant channels over 30 years of reputation. This critical finding proves that **direct sales and certified provenance are precisely the structural solution needed** to liberate vulnerable producers from the middleman trap.
-
----
-
-## ⚖️ Engineering Status: What is Live vs. Sandbox Simulation
-
-To ensure complete transparency before technical reviewers from **Stellar Development Foundation (SDF)** and **Drips Network**:
-
-| Subsystem | Current State | Technical Implementation Detail |
-| :--- | :---: | :--- |
-| **Progressive Web App (PWA)** | 🟢 **LIVE** | 100% functional React 19 + TypeScript client, installable on Android/iOS with service workers. |
-| **Offline-First Resilience** | 🟢 **LIVE** | ACID transactional queue in browser `IndexedDB`. Records voice, GPS, and lots without cell signal and auto-syncs upon reconnection. |
-| **Acoustic Voice Engine** | 🟢 **LIVE** | 24kbps Opus compression via W3C Web Audio API with semantic parsing for Spanish and *Tu'un Savi* (Mixteco). |
-| **Elder Accessibility UI** | 🟢 **LIVE** | "Modo Abuelo" interface with 112px touch targets, high-contrast outdoor theme, zero complex typing. |
-| **Cryptographic Digest Engine** | 🟢 **LIVE** | Canonical SHA-256 Community Digest calculation and Ed25519 signature verification (`CryptoEngine.ts`). |
-| **Physical Hang-Tag QR Labels** | 🟢 **LIVE** | Dynamic SVG ISO/IEC 18004 generation linking physical sacks/crafts to digital passport hashes. |
-| **Soroban Blockchain Adapter** | 🟡 **SANDBOX** | `SorobanAdapter.ts` currently runs in a **Testnet Mock Sandbox mode** (emitting structured cryptographic receipts `stx_...` and mock ledger sequence numbers while smart contract RPC integrations undergo Testnet hardening). |
-| **Smart Contracts (Rust/Soroban)** | 🟡 **COMPILED** | Smart contract source code is complete in `/contracts` (`lot_passport`, `fair_escrow`, `attestation_registry`, `perpetual_royalties`) with passing unit tests (`cargo test`), preparing for formal Testnet deployment and security audit. |
-| **Trustless Work Escrow** | 🟡 **SANDBOX** | Escrow logic follows the audited [ADR-001 Trustless Work specification](./docs/adr/ADR-001-TRUSTLESS-WORK-ESCROW.md), simulated in client runtime for 30% origin advance / 70% delivery release prior to on-chain deployment. |
-
----
-
 ## 💳 Unified 3-Tier Settlement Architecture
 
 To resolve ambiguity between on-chain escrow, off-ramps, and cash distribution:
