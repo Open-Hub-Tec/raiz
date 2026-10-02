@@ -145,19 +145,6 @@ export const MainMenuScreen: React.FC<MainMenuScreenProps> = ({
     }
   };
 
-  const handleNumericSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const matched = matchMainMenuOption(numericInput);
-    if (matched) {
-      executeMenuOption(matched);
-      setMicStatusMessage(null);
-    } else if (numericInput.trim()) {
-      setMicStatusMessage(`No se reconoció "${numericInput}". Por favor elija 1, 2, 3, 4, 5 o 6.`);
-      setTimeout(() => setMicStatusMessage(null), 4000);
-    }
-    setNumericInput('');
-  };
-
   const toggleVoiceMenuRecording = async () => {
     if (isRecording) {
       // STOP recording
