@@ -21,11 +21,21 @@ Un programa que conecta el mundo real con la blockchain.
 - **AIQualityOracle:** Revisa la foto del grano de café y dice si tiene más de 85 puntos de calidad.
 - **AIEUDRSatelliteOracle:** Revisa las fotos del satélite de la Unión Europea y confirma que no se taló selva.
 
+### ¿Qué es Trustless Work?
+La infraestructura de Smart Contracts en Soroban que usamos para la **custodia de fondos (Escrow)** con hitos de pago: el comprador bloquea el dinero antes de cosechar, se libera un anticipo del 30% cuando se certifica el origen, y el 70% restante cuando se entrega la mercancía en la cooperativa.
+
 ### ¿Qué es MicoPay?
-La red comunitaria de pagos y cajeros móviles (transportistas locales y comercios aliados) que permite entregar **efectivo en mano** al campesino en su propia parcela o pueblo mediante un código QR en el celular, cuando no tiene tarjeta de banco ni cuenta bancaria.
+La red comunitaria de pagos y cajeros móviles (transportistas locales y cooperativas aliadas) que permite entregar **efectivo en mano** al campesino en su propia parcela o pueblo mediante un código QR en el celular, cuando no tiene tarjeta de banco ni cuenta bancaria.
 
 ### ¿Qué es Etherfuse?
-La empresa aliada que conecta Stellar con **Banxico (SPEI)** en México, permitiendo mandar pesos directo a las tarjetas del Banco del Bienestar.
+La empresa aliada que conecta Stellar con **Banxico (SPEI)** en México, permitiendo mandar pesos directo a las cuentas y tarjetas del Banco del Bienestar.
+
+---
+
+## 🏛️ Arquitectura Unificada de Liquidación (3 Capas)
+1. **Capa 1 (Custodia Criptográfica):** Smart Contract de Trustless Work en Soroban (bloqueo y liberación por hitos).
+2. **Capa 2 (Efectivo en Parcela):** Nodos comunitarios MicoPay para campesinos no bancarizados.
+3. **Capa 3 (Banca Fiduciaria Regulada):** Etherfuse SPEI hacia Banco del Bienestar / MoneyGram Stellar Access para productores con cuenta.
 
 ---
 
