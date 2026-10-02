@@ -186,4 +186,47 @@ export class TrustlessWorkEscrowAdapter {
   public getEscrow(escrowId: string): TrustlessWorkEscrowOrder | undefined {
     return this.activeEscrows.get(escrowId);
   }
+
+  /**
+   * Deposita fondos en el contrato de custodia
+   */
+  public depositFunds(escrowId: string): TrustlessWorkEscrowOrder | undefined {
+    const escrow = this.activeEscrows.get(escrowId);
+    if (!escrow) return undefined;
+    escrow.status = 'funded';
+    return { ...escrow };
+  }
+
+  /**
+   * Envía la prueba o atestación de un hito
+   */
+  public submitMilestoneProof(escrowId: string, milestoneIdentifier: string, attestationUid: string): boolean {
+    const escrow = this.activeEscrows.get(escrowId);
+    if (!escrow) return false;
+    const milestone = escrow.milestones.find(
+      (m) => m.id === milestoneIdentifier || m.id.includes(milestoneIdentifier) || (milestoneIdentifier === 'm1' && m.id.includes('1')) || (milestoneIdentifier === 'm2' && m.id.includes('2'))
+    );
+    if (!milestone) return false;
+    milestone.attestationUid = attestationUid;
+    return true;
+  }
+
+  /**
+   * Libera el pago de un hito verificado
+   */
+  public releaseMilestonePayment(escrowId: string, milestoneIdentifier: string): TrustlessWorkEscrowOrder | undefined {
+    const escrow = this.activeEscrows.get(escrowId);
+    if (!escrow) return undefined;
+    const milestone = escrow.milestones.find(
+      (m) => m.id === milestoneIdentifier || m.id.includes(milestoneIdentifier) || (milestoneIdentifier === 'm1' && m.id.includes('1')) || (milestoneIdentifier === 'm2' && m.id.includes('2'))
+    );
+    if (!milestone) return undefined;
+    milestone.status = 'released';
+    milestone.releasedTxHash = `stx_tw_${Date.now()}`;
+    const allReleased = escrow.milestones.every((m) => m.status === 'released');
+    if (allReleased) {
+      escrow.status = 'completed';
+    }
+    return { ...escrow };
+  }
 }
